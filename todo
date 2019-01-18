@@ -1,0 +1,60 @@
+internal:
+  {
+    'account': {
+      'admin': [
+        { iat: 123456789, '>': 'account.admin' }
+      ]
+    },
+    'account.admin': {
+      'username': [
+        { iat: 123456789, '=': 'admin' }
+      ],
+      'pizza': [
+        { iat: 123456789, '=': 'calzone' },
+        { iat: 123456790, '=': 'yes please' }
+      ]
+    }
+  }
+
+put account.admin {username:'admin'}
+  account.admin ?: {} (publish 'account.admin' {iat:now,'>':'account.admin'})
+  account.admin.username ?: []
+  account.admin.username.push({ iat: now, '=': admin })
+  publish 'account.admin.username' {iat:now,'=':admin}
+
+recv 'account.admin.username' {iat:now,'=':admin}
+  fetch 'account' .admin > ( empty = 'make account.admin' )
+  fetch 'account.admin' .username
+  push obj
+
+put account.admin.pubkey { md5: { alg: 'ed25519', data: 'deadbeef' } }
+  account.admin        ? follow ref : new 'account.admin' >
+  account.admin.pubkey ? follow ref : new 'account.admin.pubkey' >
+  account.admin.pubkey.md5 ? follow ref : new 'account.admin...' >
+  publish 'account.admin.pubkey.md5.alg' {iat:now,=:'ed25519'}
+  publish 'account.admin.pubkey.md5.data' {iat:now,=:'deadbeef'}
+
+request 'account.admin.pubkey'
+  everyone who holds that path re-publishes it
+    if it's a property ([{=:data}]), publish full ledger
+    if it's an object ({prop:[{=:data}]}), publish whole obj
+
+signed data:
+  publish: {
+    iat:now,
+    =  :'some value',
+    a:'rsa-512'|'ed25529'..., // Algorithm of the current key
+    s:'deadbeef',             // Signature by the curreny key
+    k:'pubkeydata',           // The public key of the signer
+    oa:'old-algorithm'        // Algorithm of the old key              (for re-keying)
+    ok:'oldkeydata',          // The previous public key of the signer (for re-keying)
+    os:'oldkeysig',           // Signature by the old key              (for re-keying)
+  }
+
+Peers must reject a changing key (if not in .ok & signed)
+Peers must reject unsigned after data has been signed
+Peers must reject invalid signatures
+Peers must reject unsupported algorithms
+Peers must reject signed data if they don't have the full path (fetch it?)
+
+Signature system must be pluggable?
