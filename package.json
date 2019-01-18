@@ -1,0 +1,19 @@
+{
+  "name": "yenta",
+  "version": "0.0.2",
+  "description": "Distributed graph database",
+  "main": "yenta.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://gitlab.com/finwo/yenta.git"
+  },
+  "author": "Robin Bron <robin@finwo.nl>",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://gitlab.com/finwo/yenta/issues"
+  },
+  "homepage": "https://gitlab.com/finwo/yenta#readme"
+}
