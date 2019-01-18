@@ -58,3 +58,5 @@ Peers must reject unsupported algorithms
 Peers must reject signed data if they don't have the full path (fetch it?)
 
 Signature system must be pluggable?
+
+Rename to tankdb
