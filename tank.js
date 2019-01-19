@@ -9,10 +9,10 @@
     module.exports = factory();
   } else if ('object' === typeof window) {
     // Browser export
-    window.Yenta = factory();
+    window.TankDB = factory();
   } else {
     // Unknown environment
-    throw new Error('Yenta is not supported in this environment');
+    throw new Error('TankDB is not supported in this environment');
   }
 
 })(function() {
@@ -21,10 +21,10 @@
   let universe = new Function('return this').call();
 
   // Our main constructor
-  function Yenta(options) {
+  function Tank(options) {
 
     // Sanity checks
-    if ( this === universe ) return new Yenta(options);
+    if ( this === universe ) return new Tank(options);
     let opts  = Object.assign({},options),
         fresh = '_' in this;
 
@@ -54,19 +54,19 @@
   }
 
   // Register an action to a hook
-  Yenta.on = function( name, handler ) {
-    if ('function' !== typeof handler ) return Yenta;
-    if ('string' !== typeof name ) return Yenta;
-    if (!handler) return Yenta;
-    if (!name) return Yenta;
+  Tank.on = function( name, handler ) {
+    if ('function' !== typeof handler ) return Tank;
+    if ('string' !== typeof name ) return Tank;
+    if (!handler) return Tank;
+    if (!name) return Tank;
     if (!(name in hooks)) hooks[name] = [];
     hooks[name].push(handler);
-    return Yenta;
+    return Tank;
   }
 
   // Be somewhat compatible with gunjs
-  Yenta.chain = Yenta.prototype;
+  Tank.chain = Tank.prototype;
 
   // Return what we've built
-  return Yenta;
+  return Tank;
 });
