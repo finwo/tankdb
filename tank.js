@@ -149,6 +149,7 @@
   });
 
   // Network deduplication
+  // Blocks already-seen messages
   let txdedup = [];
   Tank.on('in', function( next, msg ) {
     let stringified = JSON.stringify(msg);
@@ -164,9 +165,22 @@
 
   // Network retransmission
   Tank.on('in', function( next, msg ) {
+    next(msg);
     // TODO: verify signatures etc
     this.out(msg);
+  });
+
+  // Handle tank's own listeners
+  let localListeners = {};
+  Tank.on('in', function( next, msg ) {
     next(msg);
+    if (!msg._) return;
+    if (!(msg._ in localListeners)) return;
+    let queue = localListeners[msg._];
+    localListeners[msg._] = [];
+    queue.forEach(function(fn) {
+      fn( msg['='] );
+    });
   });
 
   // Be somewhat compatible with gunjs

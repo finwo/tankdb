@@ -1,3 +1,14 @@
+// Simple in-memory kv
+let kv = {
+  _: {},
+  get: function( key ) {
+    return kv._[key];
+  },
+  put: function( key, value ) {
+    return kv._[key] = value;
+  },
+}
+
 // Load the lib
 let Tank = require('./tank');
 
@@ -7,6 +18,16 @@ Tank.on('in', function(next, msg) {
 });
 Tank.on('out', function(next, msg) {
   console.log('OUT', this, msg);
+});
+
+// KV adapter
+Tank.on('get', function(next, key) {
+  Tank.in({ '_': key, '=': kv.get(key) });
+  next(key);
+});
+Tank.on('put', function(next, key, value) {
+  kv.put(key, value);
+  next(key);
 });
 
 // Create a database
@@ -19,6 +40,8 @@ let adminRef = tank.get('account').get('admin');
 adminRef.put({
   username: 'admin',
 });
+
+console.log(kv._);
 
 console.log(tank);
 console.log(adminRef);
