@@ -2,11 +2,11 @@
 let Tank = require('./tank');
 
 // Attach listeners to verify IO
-Tank.on('in', function(data, next) {
-  console.log('IN', this, data);
+Tank.on('in', function(next, msg) {
+  console.log('IN', this, msg);
 });
-Tank.on('out', function(data, next) {
-  console.log('OUT', this, data);
+Tank.on('out', function(next, msg) {
+  console.log('OUT', this, msg);
 });
 
 // Create a database

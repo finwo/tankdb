@@ -63,14 +63,14 @@
   }
 
   // Easy in trigger
-  Tank.prototype.in = function( data ) {
-    trigger( this._.root, 'in', data );
+  Tank.prototype.in = function() {
+    trigger( this._.root, 'in', arguments );
     return this;
   };
 
   // Easy out trigger
-  Tank.prototype.out = function( data ) {
-    trigger( this._.root, 'out', data );
+  Tank.prototype.out = function() {
+    trigger( this._.root, 'out', arguments );
     return this;
   }
 
@@ -121,14 +121,14 @@
   let hooks = {};
 
   // Trigger a hook
-  function trigger( ctx, name, data ) {
+  function trigger( ctx, name, args ) {
     if (!(name in hooks)) return;
     let queue = hooks[name].slice();
-    (function next(data) {
+    (function next() {
       let fn = queue.shift();
       if (!fn) return;
-      fn.call( ctx, data, next );
-    })(data);
+      fn.apply( ctx, [next].concat([].slice.call(arguments)));
+    }).apply(null, args);
   }
 
   // Register an action to a hook
@@ -144,12 +144,12 @@
 
   // Network deduplication
   let txdedup = [];
-  Tank.on('in', function( msg, next ) {
+  Tank.on('in', function( next, msg ) {
     let stringified = JSON.stringify(msg);
     if (~txdedup.indexOf(stringified)) return;
     next(msg);
   });
-  Tank.on('out', function( msg, next ) {
+  Tank.on('out', function( next, msg ) {
     let stringified = JSON.stringify(msg);
     txdedup.push(stringified);
     if (txdedup.length > 1000) txdedup.shift();
@@ -157,7 +157,7 @@
   });
 
   // Network retransmission
-  Tank.on('in', function( msg, next ) {
+  Tank.on('in', function( next, msg ) {
     // TODO: verify signatures etc
     this.out(msg);
     next(msg);
