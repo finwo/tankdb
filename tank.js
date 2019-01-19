@@ -20,6 +20,19 @@
   // Fetch a reference to global
   let universe = new Function('return this').call();
 
+  // Helper function
+  function type( subject ) {
+    let orgType = typeof subject;
+    switch(orgType) {
+      case 'object':
+        if ( null === typeof subject ) return 'null';
+        if (Array.isArray(subject)) return 'array';
+        return 'object';
+      default:
+        return orgType;
+    }
+  }
+
   // Our main constructor
   function Tank(options) {
 
@@ -56,6 +69,40 @@
     return Tank.call({_:Object.assign({},this._,{
       path: this._.path.concat(key),
     })});
+  }
+
+  // Writing data
+  Tank.prototype.put = function( data ) {
+
+    // Non-object data is not supported at the root
+    if (this._.path.length <= 1) {
+      if ( 'object' !== typeof data ) throw new Error('Non-object data can not be saved at the root');
+      if ( !data ) throw new Error('Non-object data can not be saved at the root');
+    }
+
+    // Publish everything with the whole path
+    // Act as if data is incoming, simplifying local persistent storage
+    let tank = this._.root;
+    (function recurse( path, data ) {
+      // TODO: handle object reference
+      Object.keys(data).forEach(function( key ) {
+        let fullpath = path.concat(key),
+            now      = new Date().getTime();
+        switch(type(data[key])) {
+          case 'array':
+          case 'object':
+            trigger( tank, 'in', { '@': now, '#': fullpath, '>': fullpath } );
+            recurse( fullpath, data[key] );
+            break;
+          case 'string':
+          case 'number':
+          case 'null':
+            trigger( tank, 'in', { '@': now, '#': fullpath, '=': data[key] });
+            break;
+        }
+      });
+    })( this._.path, data );
+    return this;
   }
 
   // Lists of hooks
