@@ -183,8 +183,8 @@
     });
   });
 
-  //   tank.in({ '@': now, '#': fullpath, '>': fullpath });
-  //   tank.in({ '@': now, '#': fullpath, '=': data[key] });
+  // tank.in({ '@': now, '#': fullpath, '>': fullpath });
+  // tank.in({ '@': now, '#': fullpath, '=': data[key] });
   // Store incoming data
   Tank.on('in', function( next, msg ) {
     next(msg);
@@ -195,6 +195,7 @@
     if (!msg['#']) return;
     if (!(msg['#']||msg['>'])) return;
 
+    // TODO: follow the path (maybe generate a fresh queue)
     console.log('PROCESS:', msg);
   });
 
