@@ -1,3 +1,7 @@
+events:
+  'in': hear decoded data from the network
+  'out': transmit plain data into the network
+
 internal:
   {
     'account': {

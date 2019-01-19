@@ -62,6 +62,18 @@
     return this;
   }
 
+  // Easy in trigger
+  Tank.prototype.in = function( data ) {
+    trigger( this._.root, 'in', data );
+    return this;
+  };
+
+  // Easy out trigger
+  Tank.prototype.out = function( data ) {
+    trigger( this._.root, 'out', data );
+    return this;
+  }
+
   // Following a path
   Tank.prototype.get = function( key ) {
     if ('string' !== typeof key) return this;
@@ -69,7 +81,7 @@
     return Tank.call({_:Object.assign({},this._,{
       path: this._.path.concat(key),
     })});
-  }
+  };
 
   // Writing data
   Tank.prototype.put = function( data ) {
@@ -82,7 +94,7 @@
 
     // Publish everything with the whole path
     // Act as if data is incoming, simplifying local persistent storage
-    let tank = this._.root;
+    let tank = this;
     (function recurse( path, data ) {
       // TODO: handle object reference
       Object.keys(data).forEach(function( key ) {
@@ -91,13 +103,13 @@
         switch(type(data[key])) {
           case 'array':
           case 'object':
-            trigger( tank, 'in', { '@': now, '#': fullpath, '>': fullpath } );
+            tank.in({ '@': now, '#': fullpath, '>': fullpath });
             recurse( fullpath, data[key] );
             break;
           case 'string':
           case 'number':
           case 'null':
-            trigger( tank, 'in', { '@': now, '#': fullpath, '=': data[key] });
+            tank.in({ '@': now, '#': fullpath, '=': data[key] });
             break;
         }
       });
@@ -128,7 +140,28 @@
     if (!(name in hooks)) hooks[name] = [];
     hooks[name].push(handler);
     return Tank;
-  }
+  };
+
+  // Network deduplication
+  let txdedup = [];
+  Tank.on('in', function( msg, next ) {
+    let stringified = JSON.stringify(msg);
+    if (~txdedup.indexOf(stringified)) return;
+    next(msg);
+  });
+  Tank.on('out', function( msg, next ) {
+    let stringified = JSON.stringify(msg);
+    txdedup.push(stringified);
+    if (txdedup.length > 1000) txdedup.shift();
+    next(msg);
+  });
+
+  // Network retransmission
+  Tank.on('in', function( msg, next ) {
+    // TODO: verify signatures etc
+    this.out(msg);
+    next(msg);
+  });
 
   // Be somewhat compatible with gunjs
   Tank.chain = Tank.prototype;
