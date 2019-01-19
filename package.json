@@ -1,19 +1,19 @@
 {
-  "name": "yenta",
-  "version": "0.0.2",
+  "name": "tankdb",
+  "version": "0.0.1",
   "description": "Distributed graph database",
-  "main": "yenta.js",
+  "main": "tank.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 0"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://gitlab.com/finwo/yenta.git"
+    "url": "git+https://gitlab.com/finwo/tank.git"
   },
   "author": "Robin Bron <robin@finwo.nl>",
   "license": "MIT",
   "bugs": {
-    "url": "https://gitlab.com/finwo/yenta/issues"
+    "url": "https://gitlab.com/finwo/tank/issues"
   },
-  "homepage": "https://gitlab.com/finwo/yenta#readme"
+  "homepage": "https://gitlab.com/finwo/tank#readme"
 }
