@@ -58,7 +58,7 @@
     };
 
     // Trigger opt on fresh instance
-    if (fresh) trigger( this, 'opt' );
+    if (fresh) trigger( this, 'create' );
     return this;
   }
 
@@ -141,6 +141,12 @@
     hooks[name].push(handler);
     return Tank;
   };
+
+  // Run opt on creation
+  Tank.on('create', function( next ) {
+    trigger( this._.root, 'opt' );
+    next();
+  });
 
   // Network deduplication
   let txdedup = [];
