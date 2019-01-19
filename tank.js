@@ -37,6 +37,7 @@
         fresh = '_' in this;
 
     // Ensure a fully-built context
+    this._ = this._ || {};
     this._ = {
       path : this._.path || [],
       root : this._.root || this,
@@ -45,14 +46,15 @@
 
     // Trigger opt on fresh instance
     if (fresh) trigger( this, 'opt' );
+    return this;
   }
 
   // Following a path
-  Yenta.prototype.get = function( key ) {
+  Tank.prototype.get = function( key ) {
     if ('string' !== typeof key) return this;
     if (!key) return this;
     return Tank.call({_:Object.assign({},this._,{
-      path: this.path.concat(key),
+      path: this._.path.concat(key),
     })});
   }
 
