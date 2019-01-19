@@ -23,8 +23,16 @@
   // Our main constructor
   function Tank(options) {
 
+    // Ensure we're a tank
+    if ( this === universe ) {
+      return new Tank(options);
+    } else {
+      if (!(this instanceof Tank)) {
+        this.__proto__ = Tank.prototype;
+      }
+    }
+
     // Sanity checks
-    if ( this === universe ) return new Tank(options);
     let opts  = Object.assign({},options),
         fresh = '_' in this;
 
@@ -37,6 +45,15 @@
 
     // Trigger opt on fresh instance
     if (fresh) trigger( this, 'opt' );
+  }
+
+  // Following a path
+  Yenta.prototype.get = function( key ) {
+    if ('string' !== typeof key) return this;
+    if (!key) return this;
+    return Tank.call({_:Object.assign({},this._,{
+      path: this.path.concat(key),
+    })});
   }
 
   // Lists of hooks
