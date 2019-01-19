@@ -170,7 +170,7 @@
     this.out(msg);
   });
 
-  // Handle tank's own listeners
+  // Handle storage adapter responses
   let localListeners = {};
   Tank.on('in', function( next, msg ) {
     next(msg);
@@ -182,6 +182,24 @@
       fn( msg['='] );
     });
   });
+
+  //   tank.in({ '@': now, '#': fullpath, '>': fullpath });
+  //   tank.in({ '@': now, '#': fullpath, '=': data[key] });
+  // Store incoming data
+  Tank.on('in', function( next, msg ) {
+    next(msg);
+
+    // Check if this msg needs processing
+    if (msg._) return;
+    if (!msg['@']) return;
+    if (!msg['#']) return;
+    if (!(msg['#']||msg['>'])) return;
+
+    console.log('PROCESS:', msg);
+  });
+
+  // TODO: add .once/.on for data listening
+  // TODO: add regular incoming data
 
   // Be somewhat compatible with gunjs
   Tank.chain = Tank.prototype;
