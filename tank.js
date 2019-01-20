@@ -35,7 +35,6 @@
 
   // Merge 2 objects
   function merge( target, source ) {
-    console.log('MERGE', target, source);
     if ('object' !== typeof target) return;
     if ('object' !== typeof source) return;
     if (!(target&&source)) return;
@@ -174,6 +173,18 @@
     next();
   });
 
+  // Handle storage adapter responses
+  let localListeners = {};
+  Tank.on('in', function( next, msg ) {
+    if (!msg._) return next(msg);
+    if (!(msg._ in localListeners)) return;
+    let queue = localListeners[msg._];
+    localListeners[msg._] = [];
+    queue.forEach(function(fn) {
+      fn( msg );
+    });
+  });
+
   // Network deduplication
   // Blocks already-seen messages
   let txdedup = [];
@@ -196,18 +207,6 @@
     this.out(msg);
   });
 
-  // Handle storage adapter responses
-  let localListeners = {};
-  Tank.on('in', function( next, msg ) {
-    next(msg);
-    if (!msg._) return;
-    if (!(msg._ in localListeners)) return;
-    let queue = localListeners[msg._];
-    localListeners[msg._] = [];
-    queue.forEach(function(fn) {
-      fn( msg );
-    });
-  });
 
   // Store incoming data
   Tank.on('in', function( next, msg ) {
@@ -274,9 +273,10 @@
       if (path.length>2) {
         localListeners[path[0]] = localListeners[path[0]] || [];
         localListeners[path[0]].push(next);
-        trigger( ctx, 'get', [path[0]] );
-        let newkey = path.shift() + '.' + path.shift();
+        let fetchkey = path[0];
+        let newkey   = path.shift() + '.' + path.shift();
         path.unshift(newkey);
+        trigger( ctx, 'get', [fetchkey] );
         return;
       }
 
@@ -295,8 +295,6 @@
         }
       }
     })();
-
-    console.log('PROCESS:', msg);
   });
 
   // TODO: add .once/.on for data listening

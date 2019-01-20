@@ -24,15 +24,14 @@ Tank.on('out', function(next, msg) {
 Tank.on('get', function(next, key) {
   let tank = this;
   next(key);
-  console.log(this);
-  setTimeout(function() {
+  // setTimeout(function() {
     tank.in({ '_': key, '=': kv.get(key) });
-  }, 1);
+  // }, 1);
 });
 Tank.on('put', function(next, key, value) {
-  console.log('PUT', key, typeof value, value);
+  console.log('-PUT', key, typeof value, value);
   kv.put(key, value);
-  next(key);
+  next(key, value);
 });
 
 // Create a database
@@ -47,7 +46,7 @@ adminRef.put({
 });
 
 setTimeout(function() {
-  console.log('DATA', kv._['account.admin']);
+  console.log('DATA', kv._);
   adminRef.put({
     username: 'root',
     fullname: 'Marco Polo',
