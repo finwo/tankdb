@@ -30,6 +30,7 @@ Tank.on('get', function(next, key) {
   }, 1);
 });
 Tank.on('put', function(next, key, value) {
+  console.log('PUT', key, typeof value, value);
   kv.put(key, value);
   next(key);
 });
@@ -45,11 +46,13 @@ adminRef.put({
   username: 'admin',
 });
 
-console.log('DATA', kv._);
-
-console.log('DB', tank);
-console.log('AREF', adminRef);
-
 setTimeout(function() {
-  console.log('DATA', kv._);
+  console.log('DATA', kv._['account.admin']);
+  adminRef.put({
+    username: 'root',
+    fullname: 'Marco Polo',
+  });
+  setTimeout(function() {
+    console.log('DATA', kv._);
+  }, 1000);
 },1000);

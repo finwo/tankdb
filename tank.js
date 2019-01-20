@@ -20,7 +20,7 @@
   // Fetch a reference to global
   let universe = new Function('return this').call();
 
-  // Helper function
+  // Detect the type of a variable
   function type( subject ) {
     let orgType = typeof subject;
     switch(orgType) {
@@ -31,6 +31,32 @@
       default:
         return orgType;
     }
+  }
+
+  // Merge 2 objects
+  function merge( target, source ) {
+    console.log('MERGE', target, source);
+    if ('object' !== typeof target) return;
+    if ('object' !== typeof source) return;
+    if (!(target&&source)) return;
+    Object.keys(source).forEach(function(key) {
+      let ltype = type(target[key]),
+          rtype = type(source[key]);
+      if ( ltype !== rtype ) {
+        target[key] = source[key];
+        return;
+      }
+      if (ltype === 'array') {
+        target[key] = target[key].concat(source[key]);
+        return;
+      }
+      if (ltype === 'object') {
+        merge(target[key], source[key]);
+        return;
+      }
+      target[key] = source[key];
+    });
+    return target;
   }
 
   // Our main constructor
@@ -183,8 +209,6 @@
     });
   });
 
-  // tank.in({ '@': now, '#': fullpath, '>': fullpath });
-  // tank.in({ '@': now, '#': fullpath, '=': data[key] });
   // Store incoming data
   Tank.on('in', function( next, msg ) {
     let ctx = this;
@@ -204,6 +228,7 @@
 
       // Handle incoming data & act accordingly
       if (incomingData) {
+        incomingData = Object.assign({}, incomingData);
 
         // Refs
         if ( path[0] !== incomingData['_'] ) {
@@ -227,7 +252,7 @@
 
           // Missing = write it
           if (!incomingData['=']) {
-            incomingData['='] = 'undefined';
+            incomingData['='] = 'null';
             trigger( ctx, 'put', [incomingData['_'],incomingData['=']] );
           }
 
@@ -258,18 +283,16 @@
       // Write direct value
       if (path.length === 2) {
 
-        // Yay, direct write, non-merge
-        if (!current) {
-          // TODO: fetch current whole??
-          trigger( ctx, 'put', [path[0], {
-            [path[1]]: [
-              {'@': new Date().getTime(), '=': value},
-            ]
-          }] )
+        // Detect what we're writing
+        let type = msg['='] ? '=' : '>';
+        if (!incomingData['=']) {
+
+          // Direct write, no merge
+          trigger( ctx, 'put', [path[0], JSON.stringify({ [path[1]]: [{ '@': msg['@'], [type]: msg[type] }] })] );
+        } else {
+          merge(incomingData['='], { [path[1]]: [{ '@': msg['@'], [type]: msg[type] }] });
+          trigger( ctx, 'put', [path[0], JSON.stringify(incomingData['='])] );
         }
-        console.log('path',path);
-        console.log('current',current);
-        console.log('incomingData',incomingData);
       }
     })();
 
