@@ -22,14 +22,15 @@ Tank.on('out', function(next, msg) {
 
 // KV adapter
 Tank.on('get', function(next, key) {
+  console.log('GET', key);
   let tank = this;
   next(key);
-  // setTimeout(function() {
+  setTimeout(function() {
     tank.in({ '_': key, '=': kv.get(key) });
-  // }, 1);
+  }, 100);
 });
 Tank.on('put', function(next, key, value) {
-  console.log('-PUT', key, typeof value, value);
+  console.log('PUT', key, typeof value, value);
   kv.put(key, value);
   next(key, value);
 });

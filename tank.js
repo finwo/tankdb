@@ -173,6 +173,30 @@
     next();
   });
 
+  // 8-slot lru cache
+  Tank.on('get', function( next, key ) {
+    this._.root._.lru = this._.root._.lru || {data:{},keys:[]};
+    let data = this._.root._.lru.data;
+    if ( key in data ) {
+      this.in({ '_': key, '=': data[key] });
+    } else {
+      next(key);
+    }
+  });
+  Tank.on('put', function( next, key, value ) {
+    this._.root._.lru = this._.root._.lru || {data:{},keys:[]};
+    let data = this._.root._.lru.data;
+    let keys = this._.root._.lru.keys;
+    data[key] = value;
+    keys.push(keys);
+    while( keys.length > 8 ) {
+      let banish = keys.shift();
+      if (~keys.indexOf(banish)) continue;
+      delete data[banish];
+    }
+    next( key, value );
+  });
+
   // Handle storage adapter responses
   let localListeners = {};
   Tank.on('in', function( next, msg ) {
