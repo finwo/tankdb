@@ -22,8 +22,12 @@ Tank.on('out', function(next, msg) {
 
 // KV adapter
 Tank.on('get', function(next, key) {
-  Tank.in({ '_': key, '=': kv.get(key) });
+  let tank = this;
   next(key);
+  console.log(this);
+  setTimeout(function() {
+    tank.in({ '_': key, '=': kv.get(key) });
+  }, 1);
 });
 Tank.on('put', function(next, key, value) {
   kv.put(key, value);
@@ -41,9 +45,11 @@ adminRef.put({
   username: 'admin',
 });
 
-console.log(kv._);
+console.log('DATA', kv._);
 
-console.log(tank);
-console.log(adminRef);
+console.log('DB', tank);
+console.log('AREF', adminRef);
 
-setTimeout(console.log,1000);
+setTimeout(function() {
+  console.log('DATA', kv._);
+},1000);

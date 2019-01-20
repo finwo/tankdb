@@ -179,7 +179,7 @@
     let queue = localListeners[msg._];
     localListeners[msg._] = [];
     queue.forEach(function(fn) {
-      fn( msg['='] );
+      fn( msg );
     });
   });
 
@@ -187,6 +187,7 @@
   // tank.in({ '@': now, '#': fullpath, '=': data[key] });
   // Store incoming data
   Tank.on('in', function( next, msg ) {
+    let ctx = this;
     next(msg);
 
     // Check if this msg needs processing
@@ -196,6 +197,82 @@
     if (!(msg['#']||msg['>'])) return;
 
     // TODO: follow the path (maybe generate a fresh queue)
+    let path  = msg['#'].slice();
+    (function next(incomingData) {
+      if (!path.length) return;
+      let current;
+
+      // Handle incoming data & act accordingly
+      if (incomingData) {
+
+        // Refs
+        if ( path[0] !== incomingData['_'] ) {
+          // Missing = write it
+          if (!incomingData['=']) {
+            incomingData['='] = JSON.stringify({
+              [path[0].split('.').pop()]: [{ '@': new Date().getTime(), '>': path[0] }]
+            });
+            trigger( ctx, 'put', [ incomingData['_'], incomingData['='] ] );
+          }
+
+          // Decode the incoming data
+          incomingData['='] = JSON.parse(incomingData['=']);
+
+          // Fetch the latest non-future version
+          current = incomingData['='][path[0].split('.').pop()].filter(function(version) {
+            return version['@'] <= (new Date().getTime());
+          }).pop();
+
+        } else {
+
+          // Missing = write it
+          if (!incomingData['=']) {
+            incomingData['='] = 'undefined';
+            trigger( ctx, 'put', [incomingData['_'],incomingData['=']] );
+          }
+
+          // Decode the incoming data
+          incomingData['='] = JSON.parse(incomingData['=']);
+        }
+
+        // Fowllow any ref
+        if (current && current['>']) {
+          localListeners[path[0]] = localListeners[path[0]] || [];
+          localListeners[path[0]].push(next);
+          path[0] = current['>'];
+          trigger( ctx, 'get', [path[0]] );
+          return;
+        }
+      }
+
+      // Iterate down if required
+      if (path.length>2) {
+        localListeners[path[0]] = localListeners[path[0]] || [];
+        localListeners[path[0]].push(next);
+        trigger( ctx, 'get', [path[0]] );
+        let newkey = path.shift() + '.' + path.shift();
+        path.unshift(newkey);
+        return;
+      }
+
+      // Write direct value
+      if (path.length === 2) {
+
+        // Yay, direct write, non-merge
+        if (!current) {
+          // TODO: fetch current whole??
+          trigger( ctx, 'put', [path[0], {
+            [path[1]]: [
+              {'@': new Date().getTime(), '=': value},
+            ]
+          }] )
+        }
+        console.log('path',path);
+        console.log('current',current);
+        console.log('incomingData',incomingData);
+      }
+    })();
+
     console.log('PROCESS:', msg);
   });
 
