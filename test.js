@@ -48,7 +48,7 @@ setTimeout(function() {
       console.log('OPTIONS',adminOptions);
     })
   });
-}, 500);
+}, 200);
 
 // // Check if we can use .once
 // let loop = 10;
