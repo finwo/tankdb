@@ -80,6 +80,8 @@
       path : this._.path || [],
       root : this._.root || this,
       opts : this._.opts || opts,
+      once : this._.once || false, // Fetch from once + path, not only path
+      map  : this._.map  || false, // Fetch from map  + path, not only path
     };
 
     // Trigger opt on fresh instance
@@ -146,7 +148,63 @@
       });
     })( this._.path, data );
     return this;
-  }
+  };
+
+  // Start fetching data
+  Tank.prototype.once = function( cb ) {
+    let ctx = this;
+
+    // .once().map()
+    // Returns a new chain, tells map to call .once
+    if ( 'function' !== typeof cb ) {
+      return Tank.call({_:Object.assign({},this._,{
+        map: false,
+        once: ctx.once
+      })});
+    }
+
+    // .map().once()
+    // Passes the callback down to the map, let map handle it
+    if ( this._.map  ) { this._.map({ once: cb }); return this; }
+
+    // Normal behavior
+    // Emit request & listen for it
+    let found = false;
+    appListeners.once.push({
+      path : ctx._.path,
+      fn   : function(msg) {
+        if (found) return;
+        msg   = Object.assign({},msg);
+        found = true;
+        if (msg['=']) {
+          cb.call(ctx,msg['='],msg['#']);
+        } else if (msg['><']) {
+          let obj = Object.assign({},msg['><']);
+          Object.keys(obj).forEach(function(prop) {
+            obj[prop] = obj[prop].filter(function(version) {
+              return version['@'] <= new Date().getTime();
+            }).sort(function( a, b ) {
+              if ( a['@'] < b['@'] ) return -1;
+              if ( a['@'] > b['@'] ) return 1;
+              return 0;
+            }).pop();
+            if (obj[prop]['>']) {
+              obj[prop] = { '#': obj[prop]['>'] };
+            } else {
+              obj[prop] = obj[prop]['='];
+            }
+          });
+          cb.call(ctx,obj,msg['#']);
+        }
+      }
+    });
+    ctx.in({ '<': ctx._.path });
+    setTimeout(function() {
+      if (found) return;
+      found = true;
+      cb.call(ctx,undefined,ctx._.path);
+    }, 2000);
+  };
 
   // Lists of hooks
   let hooks = {};
@@ -216,29 +274,15 @@
     });
   });
 
-  // Network deduplication
-  // Blocks already-seen messages
-  let txdedup = [];
-  Tank.on('in', function( next, msg ) {
-    let stringified = JSON.stringify(msg);
-    if (~txdedup.indexOf(stringified)) return;
-    next(msg);
-  });
-  Tank.on('out', function( next, msg ) {
-    let stringified = JSON.stringify(msg);
-    txdedup.push(stringified);
-    if (txdedup.length > 100) txdedup.shift();
-    next(msg);
-  });
-
   // Handle app listeners
   let appListeners = {on:[],once:[]};
   Tank.on('in', function(next, msg) {
     next(msg);
     if (!msg['#']) return;
-    if (!(msg['=']||msg['>'])) return;
+    if (!(msg['=']||msg['>']||msg['><'])) return;
     appListeners.once = appListeners.once.filter(function(listener) {
-      if ( listener.path.join('.') !== msg['#'].join('.') ) return true;
+      let msgKey = 'string' === typeof msg['#'] ? msg['#'] : msg['#'].join('.');
+      if ( listener.path.join('.') !== msgKey ) return true;
       listener.fn(msg);
       return false;
     });
@@ -246,13 +290,6 @@
       if ( listener.path.join('.') !== msg['#'].join('.') ) return;
       listener.fn(msg);
     });
-  });
-
-  // Network retransmission
-  Tank.on('in', function( next, msg ) {
-    next(msg);
-    // TODO: verify signatures etc
-    this.out(msg);
   });
 
   // Respond to data requests
@@ -271,8 +308,15 @@
 
       if (incomingData) {
 
-        // Decode
-        if (!incomingData['=']) return;
+        // Re-listen, this function should NEVER get undefined
+        // Why? Parallel .once & store generates undefined incomingData['=']
+        if (!incomingData['=']) {
+          localListeners[incomingData['_']] = localListeners[incomingData['_']] || [];
+          localListeners[incomingData['_']].push(next);
+          return trigger( ctx, 'get', [incomingData['_']] );
+        }
+
+        // Decode data
         incomingData = Object.assign({}, incomingData);
         incomingData['='] = JSON.parse(incomingData['=']);
 
@@ -284,14 +328,12 @@
         }
 
         // Follow refs
+        // TODO: this is probably broken
         if (current && current['>']) {
-          localListeners[path[0]] = localListeners[path[0]] || [];
-          localListeners[path[0]].push(next);
+          localListeners[current['>']] = localListeners[current['>']] || [];
+          localListeners[current['>']].push(next);
           path[0] = current['>'];
-          trigger( ctx, 'get', [path[0]], function() {
-            this.in({ _: path[0], '=': undefined });
-          });
-          return;
+          return trigger( ctx, 'get', [path[0]]);
         }
       }
 
@@ -302,27 +344,74 @@
         let fetchkey = path[0];
         let newkey   = path.shift() + '.' + path.shift();
         path.unshift(newkey);
-        trigger( ctx, 'get', [fetchkey], function() {
-          this.in({ _: fetchkey, '=': undefined });
-        });
-        return;
+        return trigger( ctx, 'get', [fetchkey]);
+      }
+
+      // Ensure we have data
+      if (!incomingData) {
+        localListeners[path[0]] = localListeners[path[0]] || [];
+        localListeners[path[0]].push(next);
+        return trigger( ctx, 'get', [path[0]]);
       }
 
       // It's time to fetch data
       if (path.length === 2) {
-        if (!incomingData) return;
+        if (!incomingData['=']) return;
+
+        // Fetch the most recent version
+        if (!incomingData['='][path[1]]) return;
         current = incomingData['='][path[1]].filter(function(version) {
           return version['@'] <= (new Date().getTime());
         }).pop();
 
-        // Re-publish that data
+        // If it's a ref, follow it
+        if (current['>']) {
+          localListeners[current['>']] = localListeners[current['>']] || [];
+          localListeners[current['>']].push(next);
+          path = [current['>']];
+          return trigger( ctx, 'get', [current['>']]);
+        }
+
+        // Re-publish that data (at our input, it could be a self-request)
         current['#'] = msg['<'];
-        ctx.out(current);
+        ctx.in(current);
       }
+
+      // We're fetching an object, not a property
+      if (!incomingData['=']) return;
+      Object.keys(incomingData['=']).forEach(function(key) {
+        incomingData['='][key] = incomingData['='][key].filter(function(version) {
+          return version['@'] <= new Date().getTime();
+        });
+      });
+      ctx.in({ '#': incomingData['_'], '><': incomingData['='] });
     })();
   });
 
+  // Network deduplication
+  // Blocks already-seen messages
+  let txdedup = [];
+  Tank.on('in', function( next, msg ) {
+    let stringified = JSON.stringify(msg);
+    if (~txdedup.indexOf(stringified)) return;
+    next(msg);
+  });
+  Tank.on('out', function( next, msg ) {
+    let stringified = JSON.stringify(msg);
+    txdedup.push(stringified);
+    if (txdedup.length > 100) txdedup.shift();
+    next(msg);
+  });
+
+  // Network retransmission
+  Tank.on('in', function( next, msg ) {
+    next(msg);
+    // TODO: verify signatures etc
+    this.out(msg);
+  });
+
   // Store incoming data
+  // TODO: use data request (.once) instead of local only?
   Tank.on('in', function( next, msg ) {
     let ctx = this;
     next(msg);
@@ -397,16 +486,29 @@
         return;
       }
 
+      // Ensure we have data
+      if (!incomingData) {
+        localListeners[path[0]] = localListeners[path[0]] || [];
+        localListeners[path[0]].push(next);
+        return trigger( ctx, 'get', [path[0]], function() {
+          this.in({ _: path[0], '=': undefined });
+        });
+      }
+
       // Write direct value
       if (path.length === 2) {
 
         // Detect what we're writing
         let type = msg['='] ? '=' : '>';
         if (!incomingData['=']) {
-          trigger( ctx, 'put', [path[0], JSON.stringify({ [path[1]]: [{ '@': msg['@'], [type]: msg[type] }] })] );
+          trigger( ctx, 'put', [path[0], JSON.stringify({ [path[1]]: [{ '@': msg['@'], [type]: msg[type] }] }), function(err) {
+            ctx.in(msg);
+          }]);
         } else {
           merge(incomingData['='], { [path[1]]: [{ '@': msg['@'], [type]: msg[type] }] });
-          trigger( ctx, 'put', [path[0], JSON.stringify(incomingData['='])] );
+          trigger( ctx, 'put', [path[0], JSON.stringify(incomingData['=']), function(err) {
+            ctx.in(msg);
+          }] );
         }
       }
     })();

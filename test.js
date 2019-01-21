@@ -5,15 +5,15 @@ let autolevel = require('autolevel'),
 let Tank = require('./tank');
 require('./lib/adapter/level');
 
-// IO logging
-Tank.on('get', function(next, key) {
-  console.log('GET', key);
-  next(key);
-});
-Tank.on('put', function(next, key, value) {
-  console.log('PUT', key, value);
-  next(key, value);
-});
+// // IO logging
+// Tank.on('get', function(next, key) {
+//   console.log('GET', key);
+//   next(key);
+// });
+// Tank.on('put', function(next, key, value) {
+//   console.log('PUT', key, value);
+//   next(key, value);
+// });
 Tank.on('in', function(next, msg) {
   console.log('IN', msg);
   next(msg);
@@ -34,20 +34,13 @@ adminRef.put({
   username: 'admin',
 });
 
-// console.log('Waiting 1 second');
-setTimeout(function() {
-  adminRef.put({
-    username: 'root',
-    fullname: 'Marco Polo',
+// Check if we can use .once
+let loop = 10;
+while(loop--) {
+  adminRef.once(function(admin) {
+    console.log('ADMIN', admin);
   });
-  // console.log('Waiting 1 second');
-  setTimeout(function() {
-    level.get('account', console.log.bind(console,'account') );
-    level.get('account.admin', console.log.bind(console,'account.admin') );
+}
 
-    tank.in({'<':['account','admin','username']});
-    setTimeout(function() {
-      console.log('FINISH');
-    }, 1000);
-  }, 1000);
-},1000);
+
+setTimeout(function(){}, 5000);
