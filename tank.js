@@ -101,6 +101,12 @@
 
   // Following a path
   Tank.prototype.get = function( key ) {
+    if (Array.isArray(key)) {
+      let result = this;
+      let path   = key.slice();
+      while(path.length) result = result.get(path.shift());
+      return result;
+    }
     if ('string' !== typeof key) return this;
     if (!key) return this;
     return Tank.call({_:Object.assign({},this._,{
@@ -221,8 +227,25 @@
   Tank.on('out', function( next, msg ) {
     let stringified = JSON.stringify(msg);
     txdedup.push(stringified);
-    if (txdedup.length > 1000) txdedup.shift();
+    if (txdedup.length > 100) txdedup.shift();
     next(msg);
+  });
+
+  // Handle app listeners
+  let appListeners = {on:[],once:[]};
+  Tank.on('in', function(next, msg) {
+    next(msg);
+    if (!msg['#']) return;
+    if (!(msg['=']||msg['>'])) return;
+    appListeners.once = appListeners.once.filter(function(listener) {
+      if ( listener.path.join('.') !== msg['#'].join('.') ) return true;
+      listener.fn(msg);
+      return false;
+    });
+    appListeners.on.forEach(function(listener) {
+      if ( listener.path.join('.') !== msg['#'].join('.') ) return;
+      listener.fn(msg);
+    });
   });
 
   // Network retransmission
@@ -238,7 +261,6 @@
     next(msg);
 
     // Ensure this is a request
-    if (msg._) return;
     if (!msg['<']) return;
 
     // Let's follow the path
@@ -306,10 +328,9 @@
     next(msg);
 
     // Check if this msg needs processing
-    if (msg._) return;
     if (!msg['@']) return;
     if (!msg['#']) return;
-    if (!(msg['#']||msg['>'])) return;
+    if (!(msg['=']||msg['>'])) return;
 
     // TODO: follow the path (maybe generate a fresh queue)
     let path  = msg['#'].slice();
