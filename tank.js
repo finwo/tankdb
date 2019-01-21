@@ -146,12 +146,13 @@
   let hooks = {};
 
   // Trigger a hook
-  function trigger( ctx, name, args ) {
+  function trigger( ctx, name, args, final ) {
     if (!(name in hooks)) return;
+    final = final || function(){};
     let queue = hooks[name].slice();
     (function next() {
       let fn = queue.shift();
-      if (!fn) return;
+      if (!fn) return final.apply( ctx, arguments );
       fn.apply( ctx, [next].concat([].slice.call(arguments)));
     }).apply(null, args);
   }
@@ -288,7 +289,9 @@
           localListeners[path[0]] = localListeners[path[0]] || [];
           localListeners[path[0]].push(next);
           path[0] = current['>'];
-          trigger( ctx, 'get', [path[0]] );
+          trigger( ctx, 'get', [path[0]], function() {
+            this.in({ _: path[0], '=': undefined });
+          });
           return;
         }
       }
@@ -300,7 +303,9 @@
         let fetchkey = path[0];
         let newkey   = path.shift() + '.' + path.shift();
         path.unshift(newkey);
-        trigger( ctx, 'get', [fetchkey] );
+        trigger( ctx, 'get', [fetchkey], function() {
+          this.in({ _: fetchkey, '=': undefined });
+        });
         return;
       }
 
@@ -310,8 +315,6 @@
         // Detect what we're writing
         let type = msg['='] ? '=' : '>';
         if (!incomingData['=']) {
-
-          // Direct write, no merge
           trigger( ctx, 'put', [path[0], JSON.stringify({ [path[1]]: [{ '@': msg['@'], [type]: msg[type] }] })] );
         } else {
           merge(incomingData['='], { [path[1]]: [{ '@': msg['@'], [type]: msg[type] }] });

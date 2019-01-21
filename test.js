@@ -1,42 +1,22 @@
-// Simple in-memory kv
-let kv = {
-  _: {},
-  get: function( key ) {
-    return kv._[key];
-  },
-  put: function( key, value ) {
-    return kv._[key] = value;
-  },
-}
+let autolevel = require('autolevel'),
+    level     = autolevel('dir://data/');
 
-// Load the lib
+// Load the lib + leveldb adapter
 let Tank = require('./tank');
+require('./lib/adapter/level');
 
-// Attach listeners to verify IO
-Tank.on('in', function(next, msg) {
-  console.log('IN', this, msg);
-});
-Tank.on('out', function(next, msg) {
-  console.log('OUT', this, msg);
-});
-
-// KV adapter
+// IO logging
 Tank.on('get', function(next, key) {
   console.log('GET', key);
-  let tank = this;
   next(key);
-  setTimeout(function() {
-    tank.in({ '_': key, '=': kv.get(key) });
-  }, 100);
 });
 Tank.on('put', function(next, key, value) {
-  console.log('PUT', key, typeof value, value);
-  kv.put(key, value);
+  console.log('PUT', key, value);
   next(key, value);
 });
 
 // Create a database
-let tank = Tank();
+let tank = Tank({ level });
 
 // Fetch a reference to what we're about to write
 let adminRef = tank.get('account').get('admin');
@@ -46,13 +26,15 @@ adminRef.put({
   username: 'admin',
 });
 
+// console.log('Waiting 1 second');
 setTimeout(function() {
-  console.log('DATA', kv._);
   adminRef.put({
     username: 'root',
     fullname: 'Marco Polo',
   });
-  setTimeout(function() {
-    console.log('DATA', kv._);
+  // console.log('Waiting 1 second');
+setTimeout(function() {
+    level.get('account', console.log.bind(console,'account') );
+    level.get('account.admin', console.log.bind(console,'account.admin') );
   }, 1000);
 },1000);
