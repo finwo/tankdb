@@ -14,6 +14,14 @@ Tank.on('put', function(next, key, value) {
   console.log('PUT', key, value);
   next(key, value);
 });
+Tank.on('in', function(next, msg) {
+  console.log('IN', msg);
+  next(msg);
+});
+Tank.on('out', function(next, msg) {
+  console.log('OUT', msg);
+  next(msg);
+});
 
 // Create a database
 let tank = Tank({ level });
@@ -33,8 +41,13 @@ setTimeout(function() {
     fullname: 'Marco Polo',
   });
   // console.log('Waiting 1 second');
-setTimeout(function() {
+  setTimeout(function() {
     level.get('account', console.log.bind(console,'account') );
     level.get('account.admin', console.log.bind(console,'account.admin') );
+
+    tank.in({'<':['account','admin','username']});
+    setTimeout(function() {
+      console.log('FINISH');
+    }, 1000);
   }, 1000);
 },1000);

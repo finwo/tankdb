@@ -232,6 +232,73 @@
     this.out(msg);
   });
 
+  // Respond to data requests
+  Tank.on('in', function( next, msg ) {
+    let ctx = this;
+    next(msg);
+
+    // Ensure this is a request
+    if (msg._) return;
+    if (!msg['<']) return;
+
+    // Let's follow the path
+    let path = msg['<'].slice();
+    (function next(incomingData) {
+      if (!path.length) return;
+      let current;
+
+      if (incomingData) {
+
+        // Decode
+        if (!incomingData['=']) return;
+        incomingData = Object.assign({}, incomingData);
+        incomingData['='] = JSON.parse(incomingData['=']);
+
+        // Fetch the value
+        if ( incomingData['_'] !== path[0] ) {
+          current = incomingData['='][path[0].split('.').pop()].filter(function(version) {
+            return version['@'] <= (new Date().getTime());
+          }).pop();
+        }
+
+        // Follow refs
+        if (current && current['>']) {
+          localListeners[path[0]] = localListeners[path[0]] || [];
+          localListeners[path[0]].push(next);
+          path[0] = current['>'];
+          trigger( ctx, 'get', [path[0]], function() {
+            this.in({ _: path[0], '=': undefined });
+          });
+          return;
+        }
+      }
+
+      // Iterate down if required
+      if (path.length>2) {
+        localListeners[path[0]] = localListeners[path[0]] || [];
+        localListeners[path[0]].push(next);
+        let fetchkey = path[0];
+        let newkey   = path.shift() + '.' + path.shift();
+        path.unshift(newkey);
+        trigger( ctx, 'get', [fetchkey], function() {
+          this.in({ _: fetchkey, '=': undefined });
+        });
+        return;
+      }
+
+      // It's time to fetch data
+      if (path.length === 2) {
+        if (!incomingData) return;
+        current = incomingData['='][path[1]].filter(function(version) {
+          return version['@'] <= (new Date().getTime());
+        }).pop();
+
+        // Re-publish that data
+        current['#'] = msg['<'];
+        ctx.out(current);
+      }
+    })();
+  });
 
   // Store incoming data
   Tank.on('in', function( next, msg ) {
