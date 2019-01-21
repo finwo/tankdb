@@ -266,6 +266,7 @@
   });
 
   // Handle storage adapter responses
+  // TODO: THIS MUST NOT BE A GLOBAL VARIABLE
   let localListeners = {};
   Tank.on('in', function( next, msg ) {
     if (!msg._) return next(msg);
@@ -280,6 +281,7 @@
   });
 
   // Handle app listeners
+  // TODO: THIS MUST NOT BE A GLOBAL VARIABLE
   let appListeners = {on:[],once:[]};
   Tank.on('in', function(next, msg) {
     next(msg);
