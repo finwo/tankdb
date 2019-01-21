@@ -32,15 +32,27 @@ let adminRef = tank.get('account').get('admin');
 // Write data
 adminRef.put({
   username: 'admin',
+  options : {
+    awesome: true,
+    powerful: 'yes'
+  }
 });
 
-// Check if we can use .once
-let loop = 10;
-while(loop--) {
+console.log('waiting...');
+setTimeout(function() {
+  console.log('Fetching...');
   adminRef.once(function(admin) {
     console.log('ADMIN', admin);
+    this.get('options').once(function(adminOptions) {
+      console.log('OPTIONS',adminOptions);
+    })
   });
-}
+}, 1000);
 
+// // Check if we can use .once
+// let loop = 10;
+// while(loop--) {
+// }
 
-setTimeout(function(){}, 5000);
+// Let data flow
+// setTimeout(function(){}, 5000);

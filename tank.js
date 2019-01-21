@@ -91,7 +91,7 @@
 
   // Easy in trigger
   Tank.prototype.in = function() {
-    trigger( this._.root, 'in', arguments );
+    trigger( this._.root, 'in', arguments);
     return this;
   };
 
@@ -142,6 +142,7 @@
           case 'string':
           case 'number':
           case 'null':
+          case 'boolean':
             tank.in({ '@': now, '#': fullpath, '=': data[key] });
             break;
         }
@@ -158,8 +159,8 @@
     // Returns a new chain, tells map to call .once
     if ( 'function' !== typeof cb ) {
       return Tank.call({_:Object.assign({},this._,{
-        map: false,
-        once: ctx.once
+        map  : false,
+        once : ctx.once
       })});
     }
 
@@ -239,12 +240,24 @@
   });
 
   // 8-slot lru cache
-  Tank.on('get', function( next, key ) {
-    this._.root._.lru = this._.root._.lru || {data:{},keys:[]};
-    let data = this._.root._.lru.data;
+  Tank.on('get', function retry( next, key ) {
+    let ctx = this;
+    ctx._.root._.lru = ctx._.root._.lru || {data:{},keys:[],backoff:{}};
+    let now     = new Date().getTime();
+    let data    = ctx._.root._.lru.data;
+    let backoff = ctx._.root._.lru.backoff;
+    if ( key in backoff ) {
+      if (backoff[key] > now) {
+        return setTimeout(function() {
+          retry.call( ctx, next, key );
+        }, 1);
+      }
+      delete backoff[key];
+    }
     if ( key in data ) {
-      this.in({ '_': key, '=': data[key] });
+      ctx.in({ '_': key, '=': data[key] });
     } else {
+      backoff[key] = now + 10;
       next(key);
     }
   });
@@ -267,11 +280,9 @@
   Tank.on('in', function( next, msg ) {
     if (!msg._) return next(msg);
     if (!(msg._ in localListeners)) return;
-    let queue = localListeners[msg._];
-    localListeners[msg._] = [];
-    queue.forEach(function(fn) {
-      fn( msg );
-    });
+    let fn = localListeners[msg._].shift();
+    if (!fn) return;
+    fn( msg );
   });
 
   // Handle app listeners
@@ -444,6 +455,12 @@
           // Decode the incoming data
           incomingData['='] = JSON.parse(incomingData['=']);
 
+          // Ensure our key exists
+          if (!incomingData['='][path[0].split('.').pop()]) {
+            incomingData['='][path[0].split('.').pop()] = [{ '@': new Date().getTime(), '>': path[0].split('.') }];
+            trigger( ctx, 'put', [ incomingData['_'], JSON.stringify(incomingData['=']) ] );
+          }
+
           // Fetch the latest non-future version
           current = incomingData['='][path[0].split('.').pop()].filter(function(version) {
             return version['@'] <= (new Date().getTime());
@@ -451,10 +468,10 @@
 
         } else {
 
-          // Missing = write it
+          // Missing = someone else is working on it
           if (!incomingData['=']) {
             incomingData['='] = 'null';
-            trigger( ctx, 'put', [incomingData['_'],incomingData['=']] );
+            // trigger( ctx, 'put', [incomingData['_'],incomingData['=']] );
           }
 
           // Decode the incoming data
@@ -466,10 +483,9 @@
           localListeners[path[0]] = localListeners[path[0]] || [];
           localListeners[path[0]].push(next);
           path[0] = current['>'];
-          trigger( ctx, 'get', [path[0]], function() {
+          return trigger( ctx, 'get', [path[0]], function() {
             this.in({ _: path[0], '=': undefined });
           });
-          return;
         }
       }
 
@@ -480,10 +496,9 @@
         let fetchkey = path[0];
         let newkey   = path.shift() + '.' + path.shift();
         path.unshift(newkey);
-        trigger( ctx, 'get', [fetchkey], function() {
+        return trigger( ctx, 'get', [fetchkey], function() {
           this.in({ _: fetchkey, '=': undefined });
         });
-        return;
       }
 
       // Ensure we have data
@@ -501,14 +516,10 @@
         // Detect what we're writing
         let type = msg['='] ? '=' : '>';
         if (!incomingData['=']) {
-          trigger( ctx, 'put', [path[0], JSON.stringify({ [path[1]]: [{ '@': msg['@'], [type]: msg[type] }] }), function(err) {
-            ctx.in(msg);
-          }]);
+          trigger( ctx, 'put', [path[0], JSON.stringify({ [path[1]]: [{ '@': msg['@'], [type]: msg[type] }] })]);
         } else {
           merge(incomingData['='], { [path[1]]: [{ '@': msg['@'], [type]: msg[type] }] });
-          trigger( ctx, 'put', [path[0], JSON.stringify(incomingData['=']), function(err) {
-            ctx.in(msg);
-          }] );
+          trigger( ctx, 'put', [path[0], JSON.stringify(incomingData['='])] );
         }
       }
     })();
