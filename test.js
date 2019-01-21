@@ -14,14 +14,14 @@ require('./lib/adapter/level');
 //   console.log('PUT', key, value);
 //   next(key, value);
 // });
-Tank.on('in', function(next, msg) {
-  console.log('IN', msg);
-  next(msg);
-});
-Tank.on('out', function(next, msg) {
-  console.log('OUT', msg);
-  next(msg);
-});
+// Tank.on('in', function(next, msg) {
+//   console.log('IN', msg);
+//   next(msg);
+// });
+// Tank.on('out', function(next, msg) {
+//   console.log('OUT', msg);
+//   next(msg);
+// });
 
 // Create a database
 let tank = Tank({ level });
@@ -32,6 +32,7 @@ let adminRef = tank.get('account').get('admin');
 // Write data
 adminRef.put({
   username: 'admin',
+  fullname: 'Marco Polo',
   options : {
     awesome: true,
     powerful: 'yes'
@@ -47,7 +48,7 @@ setTimeout(function() {
       console.log('OPTIONS',adminOptions);
     })
   });
-}, 1000);
+}, 500);
 
 // // Check if we can use .once
 // let loop = 10;

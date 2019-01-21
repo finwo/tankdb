@@ -242,22 +242,12 @@
   // 8-slot lru cache
   Tank.on('get', function retry( next, key ) {
     let ctx = this;
-    ctx._.root._.lru = ctx._.root._.lru || {data:{},keys:[],backoff:{}};
+    ctx._.root._.lru = ctx._.root._.lru || {data:{},keys:[]};
     let now     = new Date().getTime();
     let data    = ctx._.root._.lru.data;
-    let backoff = ctx._.root._.lru.backoff;
-    if ( key in backoff ) {
-      if (backoff[key] > now) {
-        return setTimeout(function() {
-          retry.call( ctx, next, key );
-        }, 1);
-      }
-      delete backoff[key];
-    }
     if ( key in data ) {
       ctx.in({ '_': key, '=': data[key] });
     } else {
-      backoff[key] = now + 10;
       next(key);
     }
   });
@@ -280,9 +270,13 @@
   Tank.on('in', function( next, msg ) {
     if (!msg._) return next(msg);
     if (!(msg._ in localListeners)) return;
-    let fn = localListeners[msg._].shift();
-    if (!fn) return;
-    fn( msg );
+    let queue = localListeners[msg._];
+    localListeners[msg._] = [];
+    while(queue.length) {
+      let fn = queue.shift();
+      if (!fn) continue;
+      fn(msg);
+    }
   });
 
   // Handle app listeners
@@ -424,7 +418,8 @@
   // Store incoming data
   // TODO: use data request (.once) instead of local only?
   Tank.on('in', function( next, msg ) {
-    let ctx = this;
+    let ctx  = this,
+        root = this._.root;
     next(msg);
 
     // Check if this msg needs processing
@@ -434,8 +429,10 @@
 
     // TODO: follow the path (maybe generate a fresh queue)
     let path  = msg['#'].slice();
-    (function next(incomingData) {
-      if (!path.length) return;
+    function write(incomingData) {
+
+      // Sanity check
+      if (!path.length) return root._.writing = false;
       let current;
 
       // Handle incoming data & act accordingly
@@ -457,7 +454,7 @@
 
           // Ensure our key exists
           if (!incomingData['='][path[0].split('.').pop()]) {
-            incomingData['='][path[0].split('.').pop()] = [{ '@': new Date().getTime(), '>': path[0].split('.') }];
+            incomingData['='][path[0].split('.').pop()] = [{ '@': new Date().getTime(), '>': path[0] }];
             trigger( ctx, 'put', [ incomingData['_'], JSON.stringify(incomingData['=']) ] );
           }
 
@@ -481,7 +478,7 @@
         // Fowllow any ref
         if (current && current['>']) {
           localListeners[path[0]] = localListeners[path[0]] || [];
-          localListeners[path[0]].push(next);
+          localListeners[path[0]].push(write);
           path[0] = current['>'];
           return trigger( ctx, 'get', [path[0]], function() {
             this.in({ _: path[0], '=': undefined });
@@ -492,7 +489,7 @@
       // Iterate down if required
       if (path.length>2) {
         localListeners[path[0]] = localListeners[path[0]] || [];
-        localListeners[path[0]].push(next);
+        localListeners[path[0]].push(write);
         let fetchkey = path[0];
         let newkey   = path.shift() + '.' + path.shift();
         path.unshift(newkey);
@@ -504,7 +501,7 @@
       // Ensure we have data
       if (!incomingData) {
         localListeners[path[0]] = localListeners[path[0]] || [];
-        localListeners[path[0]].push(next);
+        localListeners[path[0]].push(write);
         return trigger( ctx, 'get', [path[0]], function() {
           this.in({ _: path[0], '=': undefined });
         });
@@ -515,13 +512,26 @@
 
         // Detect what we're writing
         let type = msg['='] ? '=' : '>';
+        if (type === '>' && Array.isArray(msg[type])) {
+          msg[type] = msg[type].join('.');
+        }
         if (!incomingData['=']) {
           trigger( ctx, 'put', [path[0], JSON.stringify({ [path[1]]: [{ '@': msg['@'], [type]: msg[type] }] })]);
         } else {
           merge(incomingData['='], { [path[1]]: [{ '@': msg['@'], [type]: msg[type] }] });
           trigger( ctx, 'put', [path[0], JSON.stringify(incomingData['='])] );
         }
+
+        // Free the lock
+        root._.writing = false;
       }
+    }
+
+    // Write once we're ready
+    (function retry() {
+      if (root._.writing) return setTimeout(retry,1);
+      root._.writing = true;
+      write();
     })();
   });
 
