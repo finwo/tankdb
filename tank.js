@@ -285,12 +285,15 @@
     next(msg);
     if (!msg['#']) return;
     if (!(msg['=']||msg['>']||msg['><'])) return;
-    appListeners.once = appListeners.once.filter(function(listener) {
-      let msgKey = 'string' === typeof msg['#'] ? msg['#'] : msg['#'].join('.');
-      if ( listener.path.join('.') !== msgKey ) return true;
+    let retry  = [],
+        msgKey = 'string' === typeof msg['#'] ? msg['#'] : msg['#'].join('.');
+    while(appListeners.once.length) {
+      let listener = appListeners.once.shift();
+      if (Array.isArray(listener.path)) listener.path = listener.path.join('.');
+      if ( listener.path !== msgKey ) { retry.push(listener); continue; }
       listener.fn(msg);
-      return false;
-    });
+    }
+    while(retry.length) appListeners.once.push(retry.shift());
     appListeners.on.forEach(function(listener) {
       if ( listener.path.join('.') !== msg['#'].join('.') ) return;
       listener.fn(msg);
@@ -385,9 +388,13 @@
       // We're fetching an object, not a property
       if (!incomingData['=']) return;
       Object.keys(incomingData['=']).forEach(function(key) {
-        incomingData['='][key] = incomingData['='][key].filter(function(version) {
+        incomingData['='][key] = [incomingData['='][key].filter(function(version) {
           return version['@'] <= new Date().getTime();
-        });
+        }).sort(function(a,b) {
+          if ( a['@'] < b['@'] ) return -1;
+          if ( a['@'] > b['@'] ) return 1;
+          return 0;
+        }).pop()];
       });
       ctx.in({ '#': incomingData['_'], '><': incomingData['='] });
     })();
