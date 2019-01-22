@@ -16,7 +16,11 @@
     "url": "https://gitlab.com/finwo/tank/issues"
   },
   "homepage": "https://gitlab.com/finwo/tank#readme",
+  "optionalDependencies": {
+    "cws": "^1.0.0"
+  },
   "devDependencies": {
-    "autolevel": "^0.2.10"
+    "autolevel": "^0.2.10",
+    "ecstatic": "^3.3.0"
   }
 }

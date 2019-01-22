@@ -672,6 +672,19 @@
     unwrite();
   });
 
+  // Sending data to supported peers
+  Tank.on('out', function(next, msg) {
+    let ctx   = this._.root,
+      peers = this._.root._.opts.peers;
+    peers.forEach(function(peer) {
+      if ('object' !== typeof peer) return;
+      if (!peer) return;
+      if ('function' !== typeof peer.send) return;
+      peer.send(msg);
+    });
+    next(msg);
+  });
+
   // Be somewhat compatible with gunjs
   Tank.chain = Tank.prototype;
 
