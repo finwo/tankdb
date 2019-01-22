@@ -73,8 +73,8 @@
     }
 
     // Sanity checks
-    let opts  = Object.assign({},options),
-        fresh = '_' in this;
+    let opts  = Object.assign({ws:false},options),
+        fresh = !('_' in this);
 
     // Build the path
     this['#'] = this['#'] || [];
