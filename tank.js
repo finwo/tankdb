@@ -369,6 +369,21 @@
     next(key, value);
   });
 
+  // FIRST IN
+  // Decode incoming data from buffer/array/string
+  Tank.on('in', function(next, msg) {
+    if ('object' === typeof Buffer && Buffer.isBuffer(msg)) return next(JSON.parse(msg));
+    if (Array.isArray(msg)) msg = msg.map(function(c) { return String.fromCharCode(c); }).join('');
+    if ('string' === typeof msg) msg = JSON.parse(msg);
+    next(msg);
+  });
+
+  // FIRST OUT
+  // Encode outgoing data
+  Tank.on('out', function(next, msg) {
+    next(JSON.stringify(msg));
+  });
+
   // Handle storage adapter responses
   // TODO: THIS MUST NOT BE A GLOBAL VARIABLE
   let localListeners = {};
@@ -518,9 +533,8 @@
     next(msg);
   });
   Tank.on('out', function( next, msg ) {
-    let stringified = JSON.stringify(msg);
-    txdedup.push(stringified);
-    if (txdedup.length > 100) txdedup.shift();
+    txdedup.push(msg);
+    while (txdedup.length > 100) txdedup.shift();
     next(msg);
   });
 
