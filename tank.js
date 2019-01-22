@@ -245,7 +245,9 @@
     ctx._.root._.lru = ctx._.root._.lru || {data:{},keys:[]};
     let now     = new Date().getTime();
     let data    = ctx._.root._.lru.data;
+    let keys    = ctx._.root._.lru.keys;
     if ( key in data ) {
+      keys.push(key);
       ctx.in({ '_': key, '=': data[key] });
     } else {
       next(key);
@@ -256,7 +258,7 @@
     let data = this._.root._.lru.data;
     let keys = this._.root._.lru.keys;
     data[key] = value;
-    keys.push(keys);
+    keys.push(key);
     while( keys.length > 8 ) {
       let banish = keys.shift();
       if (~keys.indexOf(banish)) continue;
