@@ -173,34 +173,44 @@
     // Normal behavior
     // Emit request & listen for it
     let found = false;
+    function receive(msg) {
+      if (found) return;
+      msg   = Object.assign({},msg);
+      if (msg['_'] && !msg['=']) {
+        localListeners[msg['_']].push(receive);
+        return;
+      }
+      if (msg['_']) {
+        msg = {'><' : JSON.parse(msg['='])};
+      }
+      found = true;
+      if (msg['=']) {
+        cb.call(ctx,msg['='],msg['#']);
+      } else if (msg['><']) {
+        let obj = Object.assign({},msg['><']);
+        Object.keys(obj).forEach(function(prop) {
+          obj[prop] = obj[prop].filter(function(version) {
+            return version['@'] <= new Date().getTime();
+          }).sort(function( a, b ) {
+            if ( a['@'] < b['@'] ) return -1;
+            if ( a['@'] > b['@'] ) return 1;
+            return 0;
+          }).pop();
+          if (obj[prop]['>']) {
+            obj[prop] = { '#': obj[prop]['>'] };
+          } else {
+            obj[prop] = obj[prop]['='];
+          }
+        });
+        cb.call(ctx,obj,msg['#']);
+      }
+    }
     appListeners.once.push({
       path : ctx._.path,
-      fn   : function(msg) {
-        if (found) return;
-        msg   = Object.assign({},msg);
-        found = true;
-        if (msg['=']) {
-          cb.call(ctx,msg['='],msg['#']);
-        } else if (msg['><']) {
-          let obj = Object.assign({},msg['><']);
-          Object.keys(obj).forEach(function(prop) {
-            obj[prop] = obj[prop].filter(function(version) {
-              return version['@'] <= new Date().getTime();
-            }).sort(function( a, b ) {
-              if ( a['@'] < b['@'] ) return -1;
-              if ( a['@'] > b['@'] ) return 1;
-              return 0;
-            }).pop();
-            if (obj[prop]['>']) {
-              obj[prop] = { '#': obj[prop]['>'] };
-            } else {
-              obj[prop] = obj[prop]['='];
-            }
-          });
-          cb.call(ctx,obj,msg['#']);
-        }
-      }
+      fn   : receive
     });
+    localListeners[ctx._.path.join('.')] = localListeners[ctx._.path.join('.')] || [];
+    localListeners[ctx._.path.join('.')].push(receive);
     ctx.in({ '<': ctx._.path });
     setTimeout(function() {
       if (found) return;
@@ -219,32 +229,40 @@
 
     // Normal behavior
     // Emit request & keep listening
+    function receive(msg) {
+      msg = Object.assign({},msg);
+      if (msg['_']) {
+        localListeners[ctx._.path.join('.')].push(receive);
+        if (msg['='] === undefined) return;
+        msg = {'><': JSON.parse(msg['='])};
+      }
+      if (msg['=']) {
+        cb.call(ctx, msg['='], msg['#']);
+      } else if (msg['><']) {
+        let obj = Object.assign({},msg['><']);
+        Object.keys(obj).forEach(function(prop) {
+          obj[prop] = obj[prop].filter(function(version) {
+            return version['@'] <= new Date().getTime();
+          }).sort(function( a, b ) {
+            if ( a['@'] < b['@'] ) return -1;
+            if ( a['@'] > b['@'] ) return 1;
+            return 0;
+          }).pop();
+          if (obj[prop]['>']) {
+            obj[prop] = { '#': obj[prop]['>'] };
+          } else {
+            obj[prop] = obj[prop]['='];
+          }
+        });
+        cb.call(ctx,obj,msg['#']);
+      }
+    }
     appListeners.on.push({
       path: ctx._.path,
-      fn  : function(msg) {
-        msg = Object.assign({},msg);
-        if (msg['=']) {
-          cb.call(ctx, msg['='], msg['#']);
-        } else if (msg['><']) {
-          let obj = Object.assign({},msg['><']);
-          Object.keys(obj).forEach(function(prop) {
-            obj[prop] = obj[prop].filter(function(version) {
-              return version['@'] <= new Date().getTime();
-            }).sort(function( a, b ) {
-              if ( a['@'] < b['@'] ) return -1;
-              if ( a['@'] > b['@'] ) return 1;
-              return 0;
-            }).pop();
-            if (obj[prop]['>']) {
-              obj[prop] = { '#': obj[prop]['>'] };
-            } else {
-              obj[prop] = obj[prop]['='];
-            }
-          });
-          cb.call(ctx,obj,msg['#']);
-        }
-      }
+      fn  : receive
     });
+    localListeners[ctx._.path.join('.')] = localListeners[ctx._.path.join('.')] || [];
+    localListeners[ctx._.path.join('.')].push(receive);
     ctx.in({ '<': ctx._.path });
     return this;
   };
@@ -363,6 +381,8 @@
   Tank.on('in', function(next, msg) {
     next(msg);
     if (!msg['#']) return;
+
+    // Handle .once
     let retry  = [],
         msgKey = 'string' === typeof msg['#'] ? msg['#'] : msg['#'].join('.');
     while(appListeners.once.length) {
@@ -372,6 +392,8 @@
       listener.fn(msg);
     }
     while(retry.length) appListeners.once.push(retry.shift());
+
+    // Handle .on
     appListeners.on.forEach(function(listener) {
       if ( listener.path.join('.') !== msgKey ) return;
       listener.fn(msg);
