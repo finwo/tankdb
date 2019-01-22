@@ -130,6 +130,12 @@
       if ( !data ) throw new Error('Non-object data can not be saved at the root');
     }
 
+    // Publish a new reference
+    if (data['#']) {
+      tank.in({ '@': now, '#': data['#'], '>': data['#'] });
+      return this;
+    }
+
     // Publish everything with the whole path
     // Act as if data is incoming, simplifying local persistent storage
     let tank = this;
