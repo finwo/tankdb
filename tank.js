@@ -20,6 +20,8 @@
   // Fetch a reference to global
   let universe = new Function('return this').call();
 
+  function noop(){};
+
   // Detect the type of a variable
   function type( subject ) {
     let orgType = typeof subject;
@@ -166,7 +168,7 @@
 
     // .map().once()
     // Passes the callback down to the map, let map handle it
-    if ( this._.map  ) { this._.map({ once: cb }); return this; }
+    if ( this._.map  ) { this._.map('once', cb); return this; }
 
     // Normal behavior
     // Emit request & listen for it
@@ -205,6 +207,7 @@
       found = true;
       cb.call(ctx,undefined,ctx._.path);
     }, 2000);
+    return this;
   };
 
   // Fetch data, LIVE QUERY
@@ -212,7 +215,7 @@
     let ctx = this;
 
     // .map().on()
-    if ( this._.map ) { this._.map({ on: cb }); return this; }
+    if ( this._.map ) { this._.map('on', cb); return this; }
 
     // Normal behavior
     // Emit request & keep listening
@@ -243,6 +246,34 @@
       }
     });
     ctx.in({ '<': ctx._.path });
+    return this;
+  };
+
+  // Mapping data!!!
+  Tank.prototype.map = function( filter ) {
+    let fetch = this._.once ? 'once' : 'on';
+    let ctx   = this;
+
+    if ('function' !== typeof filter) {
+      filter = function( entity ) { return entity; };
+    }
+
+    return Tank.call({_:Object.assign({},this._,{
+      once : false,
+      map  : function( mode, receiver ) {
+        if (!receiver) return;
+        if (!~['on','once'].indexOf(mode)) return;
+        let knownKeys = [];
+        ctx[fetch](function(data) {
+          let keys = Object.keys(data);
+          keys.forEach(function(key) {
+            if (~knownKeys.indexOf(key)) return;
+            knownKeys.push(key);
+            ctx.get(key)[mode](receiver);
+          });
+        });
+      },
+    })});
   };
 
   // Lists of hooks
@@ -305,6 +336,12 @@
     next( key, value );
   });
 
+  // Emit local data on put
+  Tank.on('put', function( next, key, value ) {
+    this.in({ '_': key, '=': value });
+    next(key, value);
+  });
+
   // Handle storage adapter responses
   // TODO: THIS MUST NOT BE A GLOBAL VARIABLE
   let localListeners = {};
@@ -326,7 +363,6 @@
   Tank.on('in', function(next, msg) {
     next(msg);
     if (!msg['#']) return;
-    if (!(msg['=']||msg['>']||msg['><'])) return;
     let retry  = [],
         msgKey = 'string' === typeof msg['#'] ? msg['#'] : msg['#'].join('.');
     while(appListeners.once.length) {
@@ -467,21 +503,30 @@
   // Store incoming data
   // TODO: use data request (.once) instead of local only?
   Tank.on('in', function( next, msg ) {
+    next(msg);
     let ctx  = this,
         root = this._.root;
-    next(msg);
 
     // Check if this msg needs processing
     if (!msg['@']) return;
     if (!msg['#']) return;
     if (!(msg['=']||msg['>'])) return;
 
+    function unwrite() {
+      if (!root._.writeQueue) return;
+      if (!root._.writeQueue.length) {
+        delete root._.writeQueue;
+        return;
+      }
+      (root._.writeQueue.shift()||unwrite)();
+    }
+
     // TODO: follow the path (maybe generate a fresh queue)
     let path  = msg['#'].slice();
     function write(incomingData) {
 
       // Sanity check
-      if (!path.length) return root._.writing = false;
+      if (!path.length) return unwrite();
       let current;
 
       // Handle incoming data & act accordingly
@@ -572,16 +617,14 @@
         }
 
         // Free the lock
-        root._.writing = false;
+        unwrite();
       }
     }
 
     // Write once we're ready
-    (function retry() {
-      if (root._.writing) return setTimeout(retry,1);
-      root._.writing = true;
-      write();
-    })();
+    if (root._.writeQueue) return root._.writeQueue.push(write);
+    root._.writeQueue = [write];
+    unwrite();
   });
 
   // Be somewhat compatible with gunjs

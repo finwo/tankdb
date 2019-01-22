@@ -29,6 +29,15 @@ let tank = Tank({ level });
 // Fetch a reference to what we're about to write
 let adminRef = tank.get('account').get('admin');
 
+// Add listener
+adminRef.on(function(admin) {
+  console.log('UPDATE', admin);
+});
+
+adminRef.get('contact').map().on(function(contactInfo) {
+  console.log('contactInfo', contactInfo);
+});
+
 // Write data
 adminRef.put({
   username: 'admin',
@@ -36,7 +45,11 @@ adminRef.put({
   options : {
     awesome: true,
     powerful: 'yes'
-  }
+  },
+  contact: [
+    { type: 'email', value: 'marco@trackthis.nl' },
+    { type: 'website', value: 'trackthis.nl' },
+  ]
 });
 
 console.log('waiting...');
