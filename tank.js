@@ -151,7 +151,7 @@
     return this;
   };
 
-  // Start fetching data
+  // Fetch a data, non-live
   Tank.prototype.once = function( cb ) {
     let ctx = this;
 
@@ -207,6 +207,44 @@
     }, 2000);
   };
 
+  // Fetch data, LIVE QUERY
+  Tank.prototype.on = function( cb ) {
+    let ctx = this;
+
+    // .map().on()
+    if ( this._.map ) { this._.map({ on: cb }); return this; }
+
+    // Normal behavior
+    // Emit request & keep listening
+    appListeners.on.push({
+      path: ctx._.path,
+      fn  : function(msg) {
+        msg = Object.assign({},msg);
+        if (msg['=']) {
+          cb.call(ctx, msg['='], msg['#']);
+        } else if (msg['><']) {
+          let obj = Object.assign({},msg['><']);
+          Object.keys(obj).forEach(function(prop) {
+            obj[prop] = obj[prop].filter(function(version) {
+              return version['@'] <= new Date().getTime();
+            }).sort(function( a, b ) {
+              if ( a['@'] < b['@'] ) return -1;
+              if ( a['@'] > b['@'] ) return 1;
+              return 0;
+            }).pop();
+            if (obj[prop]['>']) {
+              obj[prop] = { '#': obj[prop]['>'] };
+            } else {
+              obj[prop] = obj[prop]['='];
+            }
+          });
+          cb.call(ctx,obj,msg['#']);
+        }
+      }
+    });
+    ctx.in({ '<': ctx._.path });
+  };
+
   // Lists of hooks
   let hooks = {};
 
@@ -239,7 +277,7 @@
     next();
   });
 
-  // 8-slot lru cache
+  // 64-slot lru cache
   Tank.on('get', function retry( next, key ) {
     let ctx = this;
     ctx._.root._.lru = ctx._.root._.lru || {data:{},keys:[]};
@@ -259,7 +297,7 @@
     let keys = this._.root._.lru.keys;
     data[key] = value;
     keys.push(key);
-    while( keys.length > 8 ) {
+    while( keys.length > 64 ) {
       let banish = keys.shift();
       if (~keys.indexOf(banish)) continue;
       delete data[banish];
@@ -299,7 +337,7 @@
     }
     while(retry.length) appListeners.once.push(retry.shift());
     appListeners.on.forEach(function(listener) {
-      if ( listener.path.join('.') !== msg['#'].join('.') ) return;
+      if ( listener.path.join('.') !== msgKey ) return;
       listener.fn(msg);
     });
   });
@@ -545,9 +583,6 @@
       write();
     })();
   });
-
-  // TODO: add .once/.on for data listening
-  // TODO: add regular incoming data
 
   // Be somewhat compatible with gunjs
   Tank.chain = Tank.prototype;
