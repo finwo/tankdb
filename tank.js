@@ -76,10 +76,12 @@
     let opts  = Object.assign({},options),
         fresh = '_' in this;
 
+    // Build the path
+    this['#'] = this['#'] || [];
+
     // Ensure a fully-built context
     this._ = this._ || {};
     this._ = {
-      path : this._.path || [],
       root : this._.root || this,
       opts : this._.opts || opts,
       once : this._.once || false, // Fetch from once + path, not only path
@@ -113,16 +115,17 @@
     }
     if ('string' !== typeof key) return this;
     if (!key) return this;
-    return Tank.call({_:Object.assign({},this._,{
-      path: this._.path.concat(key),
-    })});
+    return Tank.call({
+      '#': this['#'].concat(key),
+      '_': Object.assign({},this._),
+    });
   };
 
   // Writing data
   Tank.prototype.put = function( data ) {
 
     // Non-object data is not supported at the root
-    if (this._.path.length <= 1) {
+    if (this['#'].length <= 1) {
       if ( 'object' !== typeof data ) throw new Error('Non-object data can not be saved at the root');
       if ( !data ) throw new Error('Non-object data can not be saved at the root');
     }
@@ -149,7 +152,7 @@
             break;
         }
       });
-    })( this._.path, data );
+    })( this['#'], data );
     return this;
   };
 
@@ -206,17 +209,17 @@
       }
     }
     appListeners.once.push({
-      path : ctx._.path,
+      path : ctx['#'],
       fn   : receive
     });
-    localListeners[ctx._.path.join('.')] = localListeners[ctx._.path.join('.')] || [];
-    localListeners[ctx._.path.join('.')].push(receive);
-    ctx.in({ '<': ctx._.path });
+    localListeners[ctx['#'].join('.')] = localListeners[ctx['#'].join('.')] || [];
+    localListeners[ctx['#'].join('.')].push(receive);
+    ctx.in({ '<': ctx['#'] });
     setTimeout(function() {
       if (found) return;
       found = true;
-      cb.call(ctx,undefined,ctx._.path);
-    }, 2000);
+      cb.call(ctx,undefined,ctx['#']);
+    }, this._.opts.wait || 2000);
     return this;
   };
 
@@ -232,7 +235,7 @@
     function receive(msg) {
       msg = Object.assign({},msg);
       if (msg['_']) {
-        localListeners[ctx._.path.join('.')].push(receive);
+        localListeners[ctx['#'].join('.')].push(receive);
         if (msg['='] === undefined) return;
         msg = {'><': JSON.parse(msg['='])};
       }
@@ -258,12 +261,12 @@
       }
     }
     appListeners.on.push({
-      path: ctx._.path,
+      path: ctx['#'],
       fn  : receive
     });
-    localListeners[ctx._.path.join('.')] = localListeners[ctx._.path.join('.')] || [];
-    localListeners[ctx._.path.join('.')].push(receive);
-    ctx.in({ '<': ctx._.path });
+    localListeners[ctx['#'].join('.')] = localListeners[ctx['#'].join('.')] || [];
+    localListeners[ctx['#'].join('.')].push(receive);
+    ctx.in({ '<': ctx['#'] });
     return this;
   };
 

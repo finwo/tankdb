@@ -1,2 +1,1 @@
-change this._.path to this.#
 accept obj {#:''} and {#:[]} on put as writing ref
