@@ -13,6 +13,9 @@ function indent() {
 # Ensure clean start
 rm -rf ../data/
 
+# Setup encryption key
+export KEY=hello_world_is_commonly_used_to_showcase_a_language_syntax
+
 # Start
 echo " --> Starting server"
 node server | indent &

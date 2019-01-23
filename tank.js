@@ -372,9 +372,11 @@
   // FIRST IN
   // Decode incoming data from buffer/array/string
   Tank.on('in', function(next, msg) {
-    if ('object' === typeof Buffer && Buffer.isBuffer(msg)) return next(JSON.parse(msg));
-    if (Array.isArray(msg)) msg = msg.map(function(c) { return String.fromCharCode(c); }).join('');
-    if ('string' === typeof msg) msg = JSON.parse(msg);
+    try {
+      if ('object' === typeof Buffer && Buffer.isBuffer(msg)) return next(JSON.parse(msg));
+      if (Array.isArray(msg)) msg = msg.map(function(c) { return String.fromCharCode(c); }).join('');
+      if ('string' === typeof msg) msg = JSON.parse(msg);
+    } catch(e) {}
     next(msg);
   });
 
@@ -404,6 +406,7 @@
   let appListeners = {on:[],once:[]};
   Tank.on('in', function(next, msg) {
     next(msg);
+    if ('object' !== typeof msg) return;
     if (!msg['#']) return;
 
     // Handle .once
@@ -428,6 +431,7 @@
   Tank.on('in', function( next, msg ) {
     let ctx = this;
     next(msg);
+    if ('object' !== typeof msg) return;
 
     // Ensure this is a request
     if (!msg['<']) return;
@@ -549,6 +553,7 @@
   // TODO: use data request (.once) instead of local only?
   Tank.on('in', function( next, msg ) {
     next(msg);
+    if ('object' !== typeof msg) return;
     let ctx  = this,
         root = this._.root;
 

@@ -21,6 +21,7 @@
   },
   "devDependencies": {
     "autolevel": "^0.2.10",
-    "ecstatic": "^3.3.0"
+    "ecstatic": "^3.3.0",
+    "ws-rc4": "^0.1.3"
   }
 }
