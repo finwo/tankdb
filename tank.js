@@ -132,7 +132,7 @@
 
     // Publish a new reference
     if (data['#']) {
-      tank.in({ '@': now, '#': data['#'], '>': data['#'] });
+      this.in({ '@': now, '#': data['#'], '>': data['#'] });
       return this;
     }
 
