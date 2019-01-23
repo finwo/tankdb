@@ -344,34 +344,6 @@
     next();
   });
 
-  // 8-slot lru cache
-  Tank.on('get', function retry( next, key ) {
-    let ctx = this;
-    ctx._.root._.lru = ctx._.root._.lru || {data:{},keys:[]};
-    let now     = new Date().getTime();
-    let data    = ctx._.root._.lru.data;
-    let keys    = ctx._.root._.lru.keys;
-    if ( key in data ) {
-      keys.push(key);
-      ctx.in({ '_': key, '=': data[key] });
-    } else {
-      next(key);
-    }
-  });
-  Tank.on('put', function( next, key, value ) {
-    this._.root._.lru = this._.root._.lru || {data:{},keys:[]};
-    let data = this._.root._.lru.data;
-    let keys = this._.root._.lru.keys;
-    data[key] = value;
-    keys.push(key);
-    while( keys.length > 8 ) {
-      let banish = keys.shift();
-      if (~keys.indexOf(banish)) continue;
-      delete data[banish];
-    }
-    next( key, value );
-  });
-
   // Emit local data on put
   Tank.on('put', function( next, key, value ) {
     this.in({ '_': key, '=': value });
@@ -387,6 +359,25 @@
       if ('string' === typeof msg) msg = JSON.parse(msg);
     } catch(e) {}
     next(msg);
+  });
+
+  // Response cache
+  Tank.on('in', function(next, msg) {
+    next(msg);
+    if (!this._.root._.responseCache) this._.root._.responseCache = {data:{},keys:[]};
+    let cache = this._.root._.responseCache;
+    if (msg['><']) {
+      cache.keys.push(msg['#']);
+      cache.data[msg['#']] = msg['><'];
+    }
+    if (msg['<'] && (msg['<'] in cache.data)) {
+      this.in({ '#': msg['<'], '><': cache.data[msg['<']] });
+    }
+    while (cache.keys.length>8) {
+      let banish = cache.keys.shift();
+      if (~cache.keys.indexOf(banish)) continue;
+      delete cache.data[banish];
+    }
   });
 
   // FIRST OUT
@@ -548,7 +539,7 @@
   Tank.on('out', function( next, msg ) {
     txdedup.push(msg);
     if (!dedupto) dedupto = setTimeout(function() {
-      while(txdedup.length > 1) txdedup.shift();
+      while(txdedup.length) txdedup.shift();
       dedupto = false;
     }, 100);
     next(msg);
