@@ -227,7 +227,7 @@
     });
     localListeners[ctx['#'].join('.')] = localListeners[ctx['#'].join('.')] || [];
     localListeners[ctx['#'].join('.')].push(receive);
-    ctx.in({ '<': ctx['#'] });
+    ctx.in({ '<': ctx['#'].join('.') });
     setTimeout(function() {
       if (found) return;
       found = true;
@@ -279,7 +279,7 @@
     });
     localListeners[ctx['#'].join('.')] = localListeners[ctx['#'].join('.')] || [];
     localListeners[ctx['#'].join('.')].push(receive);
-    ctx.in({ '<': ctx['#'] });
+    ctx.in({ '<': ctx['#'].join('.') });
     return this;
   };
 
@@ -435,9 +435,8 @@
 
     // Ensure this is a request
     if (!msg['<']) return;
-
     // Let's follow the path
-    let path = msg['<'].slice();
+    let path = msg['<'].split('.');
     (function next(incomingData) {
       if (!path.length) return;
       let current;
