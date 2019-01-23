@@ -362,6 +362,42 @@
     next(msg);
   });
 
+  // Ensure each message has a timestamp
+  Tank.on('in', function(next, msg) {
+    if ('object' === typeof msg) msg['?'] = msg['?'] || new Date().getTime();
+    next(msg);
+  });
+
+  // FIRST OUT
+  // Encode outgoing data
+  Tank.on('out', function(next, msg) {
+    next(JSON.stringify(msg));
+  });
+
+  // Network deduplication
+  // Blocks already-seen messages
+  let txdedup = [], dedupto;
+  Tank.on('in', function( next, msg ) {
+    let stringified = JSON.stringify(msg);
+    if (~txdedup.indexOf(stringified)) return;
+    next(msg);
+  });
+  Tank.on('out', function( next, msg ) {
+    txdedup.push(msg);
+    if (!dedupto) dedupto = setTimeout(function() {
+      while(txdedup.length > 16) txdedup.shift();
+      dedupto = false;
+    }, 100);
+    next(msg);
+  });
+
+  // Network retransmission
+  Tank.on('in', function( next, msg ) {
+    next(msg);
+    // TODO: verify signatures etc
+    this.out(msg);
+  });
+
   // Response cache
   Tank.on('in', function(next, msg) {
     next(msg);
@@ -379,12 +415,6 @@
       if (~cache.keys.indexOf(banish)) continue;
       delete cache.data[banish];
     }
-  });
-
-  // FIRST OUT
-  // Encode outgoing data
-  Tank.on('out', function(next, msg) {
-    next(JSON.stringify(msg));
   });
 
   // Handle storage adapter responses
@@ -527,30 +557,6 @@
       });
       ctx.in({ '#': incomingData['_'], '><': incomingData['='] });
     })();
-  });
-
-  // Network deduplication
-  // Blocks already-seen messages
-  let txdedup = [], dedupto;
-  Tank.on('in', function( next, msg ) {
-    let stringified = JSON.stringify(msg);
-    if (~txdedup.indexOf(stringified)) return;
-    next(msg);
-  });
-  Tank.on('out', function( next, msg ) {
-    txdedup.push(msg);
-    if (!dedupto) dedupto = setTimeout(function() {
-      while(txdedup.length) txdedup.shift();
-      dedupto = false;
-    }, 100);
-    next(msg);
-  });
-
-  // Network retransmission
-  Tank.on('in', function( next, msg ) {
-    next(msg);
-    // TODO: verify signatures etc
-    this.out(msg);
   });
 
   // Store incoming data
