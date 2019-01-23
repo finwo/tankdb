@@ -132,7 +132,7 @@
 
     // Publish a new reference
     if (data['#']) {
-      this.in({ '@': now, '#': data['#'], '>': data['#'] });
+      this.in({ '@': new Date().getTime(), '#': data['#'], '>': data['#'] });
       return this;
     }
 
