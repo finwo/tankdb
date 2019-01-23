@@ -548,7 +548,7 @@
   Tank.on('out', function( next, msg ) {
     txdedup.push(msg);
     if (!dedupto) dedupto = setTimeout(function() {
-      while(txdedup.length > 100) txdedup.shift();
+      while(txdedup.length > 1) txdedup.shift();
       dedupto = false;
     }, 100);
     next(msg);
