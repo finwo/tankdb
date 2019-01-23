@@ -118,6 +118,7 @@
       while(path.length) result = result.get(path.shift());
       return result;
     }
+    if ('number' === typeof key) key = key.toString();
     if ('string' !== typeof key) return this;
     if (!key) return this;
     return Tank.call({
