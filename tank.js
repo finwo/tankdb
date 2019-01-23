@@ -292,6 +292,8 @@
         if (!~['on','once'].indexOf(mode)) return;
         let knownKeys = [];
         ctx[fetch](function(data) {
+          data = filter(data);
+          if ('undefined' === typeof data) return;
           let keys = Object.keys(data);
           keys.forEach(function(key) {
             if (~knownKeys.indexOf(key)) return;
