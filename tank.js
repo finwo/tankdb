@@ -457,6 +457,7 @@
 
         // Fetch the value
         if ( incomingData['_'] !== path[0] ) {
+          if (!incomingData['='][path[0].split('.').pop()]) return;
           current = incomingData['='][path[0].split('.').pop()].filter(function(version) {
             return version['@'] <= (new Date().getTime());
           }).pop();
