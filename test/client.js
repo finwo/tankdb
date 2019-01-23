@@ -4,6 +4,7 @@ require('../lib/adapter/websocket');
 const db = Tank({
   node : 'CLIENT',
   peers: ['ws://localhost:10666'],
+  WebSocket : require('ws-rc4')(process.env.KEY),
 });
 
 // Fetch a reference to what we're about to write
