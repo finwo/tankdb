@@ -1,6 +1,6 @@
 {
   "name": "tankdb",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "Distributed graph database",
   "main": "tank.js",
   "scripts": {
