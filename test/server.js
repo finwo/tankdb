@@ -15,11 +15,13 @@ server.listen(10666, function(err) {
 // Load the db
 const Tank = require('../tank');
 require('../lib/adapter/websocket');
+require('../lib/adapter/level');
 
 // Setup the db
 console.log('SERVER');
 const db = Tank({
   node : 'server',
+  level: level,
   ws   : {server},
 });
 

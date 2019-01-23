@@ -675,7 +675,8 @@
   // Sending data to supported peers
   Tank.on('out', function(next, msg) {
     let ctx   = this._.root,
-      peers = this._.root._.opts.peers;
+        peers = this._.root._.opts.peers;
+    if (!peers) return;
     peers.forEach(function(peer) {
       if ('object' !== typeof peer) return;
       if (!peer) return;
