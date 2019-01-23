@@ -93,6 +93,11 @@
     return this;
   }
 
+  // Prevent circular json
+  Tank.prototype.toJSON = function() {
+    return {'#':this['#']};
+  };
+
   // Easy in trigger
   Tank.prototype.in = function() {
     trigger( this._.root, 'in', arguments);
@@ -136,16 +141,11 @@
       return this;
     }
 
-    // Publish a null
-    if ( null === data ) {
-      this.in({ '@': new Date().getTime(), '#': data['#'], '=': null });
-      return this;
-    }
-
     // Publish everything with the whole path
     // Act as if data is incoming, simplifying local persistent storage
     let tank = this;
     (function recurse( path, data ) {
+
       // TODO: handle object reference
       Object.keys(data).forEach(function( key ) {
         let fullpath = path.concat(key),
@@ -153,6 +153,7 @@
         switch(type(data[key])) {
           case 'array':
           case 'object':
+            if (!data[key]) return tank.in({ '@': now, '#': fullpath, '=': null })
             tank.in({ '@': now, '#': fullpath, '>': fullpath });
             recurse( fullpath, data[key] );
             break;
