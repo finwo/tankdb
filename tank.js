@@ -344,7 +344,7 @@
     next();
   });
 
-  // 64-slot lru cache
+  // 8-slot lru cache
   Tank.on('get', function retry( next, key ) {
     let ctx = this;
     ctx._.root._.lru = ctx._.root._.lru || {data:{},keys:[]};
@@ -364,7 +364,7 @@
     let keys = this._.root._.lru.keys;
     data[key] = value;
     keys.push(key);
-    while( keys.length > 64 ) {
+    while( keys.length > 8 ) {
       let banish = keys.shift();
       if (~keys.indexOf(banish)) continue;
       delete data[banish];
@@ -539,7 +539,7 @@
 
   // Network deduplication
   // Blocks already-seen messages
-  let txdedup = [];
+  let txdedup = [], dedupto;
   Tank.on('in', function( next, msg ) {
     let stringified = JSON.stringify(msg);
     if (~txdedup.indexOf(stringified)) return;
@@ -547,7 +547,10 @@
   });
   Tank.on('out', function( next, msg ) {
     txdedup.push(msg);
-    while (txdedup.length > 100) txdedup.shift();
+    if (!dedupto) dedupto = setTimeout(function() {
+      while(txdedup.length > 100) txdedup.shift();
+      dedupto = false;
+    }, 100);
     next(msg);
   });
 
