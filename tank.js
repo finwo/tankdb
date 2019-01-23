@@ -136,6 +136,12 @@
       return this;
     }
 
+    // Publish a null
+    if ( null === data ) {
+      this.in({ '@': new Date().getTime(), '#': data['#'], '=': null });
+      return this;
+    }
+
     // Publish everything with the whole path
     // Act as if data is incoming, simplifying local persistent storage
     let tank = this;
