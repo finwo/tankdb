@@ -226,9 +226,9 @@
       path : ctx['#'],
       fn   : receive
     });
-    localListeners[ctx['#'].join('.')] = localListeners[ctx['#'].join('.')] || [];
-    localListeners[ctx['#'].join('.')].push(receive);
-    ctx.in({ '<': ctx['#'].join('.') });
+    localListeners[ctx['#'].join('/')] = localListeners[ctx['#'].join('/')] || [];
+    localListeners[ctx['#'].join('/')].push(receive);
+    ctx.in({ '<': ctx['#'].join('/') });
     setTimeout(function() {
       if (found) return;
       found = true;
@@ -249,7 +249,7 @@
     function receive(msg) {
       msg = Object.assign({},msg);
       if (msg['_']) {
-        localListeners[ctx['#'].join('.')].push(receive);
+        localListeners[ctx['#'].join('/')].push(receive);
         if (msg['='] === undefined) return;
         msg = {'><': JSON.parse(msg['='])};
       }
@@ -278,9 +278,9 @@
       path: ctx['#'],
       fn  : receive
     });
-    localListeners[ctx['#'].join('.')] = localListeners[ctx['#'].join('.')] || [];
-    localListeners[ctx['#'].join('.')].push(receive);
-    ctx.in({ '<': ctx['#'].join('.') });
+    localListeners[ctx['#'].join('/')] = localListeners[ctx['#'].join('/')] || [];
+    localListeners[ctx['#'].join('/')].push(receive);
+    ctx.in({ '<': ctx['#'].join('/') });
     return this;
   };
 
@@ -412,10 +412,10 @@
 
     // Handle .once
     let retry  = [],
-        msgKey = 'string' === typeof msg['#'] ? msg['#'] : msg['#'].join('.');
+        msgKey = 'string' === typeof msg['#'] ? msg['#'] : msg['#'].join('/');
     while(appListeners.once.length) {
       let listener = appListeners.once.shift();
-      if (Array.isArray(listener.path)) listener.path = listener.path.join('.');
+      if (Array.isArray(listener.path)) listener.path = listener.path.join('/');
       if ( listener.path !== msgKey ) { retry.push(listener); continue; }
       listener.fn(msg);
     }
@@ -423,7 +423,7 @@
 
     // Handle .on
     appListeners.on.forEach(function(listener) {
-      if ( listener.path.join('.') !== msgKey ) return;
+      if ( listener.path.join('/') !== msgKey ) return;
       listener.fn(msg);
     });
   });
@@ -437,7 +437,7 @@
     // Ensure this is a request
     if (!msg['<']) return;
     // Let's follow the path
-    let path = msg['<'].split('.');
+    let path = msg['<'].split('/');
     (function next(incomingData) {
       if (!path.length) return;
       let current;
@@ -458,8 +458,8 @@
 
         // Fetch the value
         if ( incomingData['_'] !== path[0] ) {
-          if (!incomingData['='][path[0].split('.').pop()]) return;
-          current = incomingData['='][path[0].split('.').pop()].filter(function(version) {
+          if (!incomingData['='][path[0].split('/').pop()]) return;
+          current = incomingData['='][path[0].split('/').pop()].filter(function(version) {
             return version['@'] <= (new Date().getTime());
           }).pop();
         }
@@ -479,7 +479,7 @@
         localListeners[path[0]] = localListeners[path[0]] || [];
         localListeners[path[0]].push(next);
         let fetchkey = path[0];
-        let newkey   = path.shift() + '.' + path.shift();
+        let newkey   = path.shift() + '/' + path.shift();
         path.unshift(newkey);
         return trigger( ctx, 'get', [fetchkey]);
       }
@@ -592,7 +592,7 @@
           // Missing = write it
           if (!incomingData['=']) {
             incomingData['='] = JSON.stringify({
-              [path[0].split('.').pop()]: [{ '@': new Date().getTime(), '>': path[0] }]
+              [path[0].split('/').pop()]: [{ '@': new Date().getTime(), '>': path[0] }]
             });
             trigger( ctx, 'put', [ incomingData['_'], incomingData['='] ] );
           }
@@ -601,13 +601,13 @@
           incomingData['='] = JSON.parse(incomingData['=']);
 
           // Ensure our key exists
-          if (!incomingData['='][path[0].split('.').pop()]) {
-            incomingData['='][path[0].split('.').pop()] = [{ '@': new Date().getTime(), '>': path[0] }];
+          if (!incomingData['='][path[0].split('/').pop()]) {
+            incomingData['='][path[0].split('/').pop()] = [{ '@': new Date().getTime(), '>': path[0] }];
             trigger( ctx, 'put', [ incomingData['_'], JSON.stringify(incomingData['=']) ] );
           }
 
           // Fetch the latest non-future version
-          current = incomingData['='][path[0].split('.').pop()].filter(function(version) {
+          current = incomingData['='][path[0].split('/').pop()].filter(function(version) {
             return version['@'] <= (new Date().getTime());
           }).pop();
 
@@ -639,7 +639,7 @@
         localListeners[path[0]] = localListeners[path[0]] || [];
         localListeners[path[0]].push(write);
         let fetchkey = path[0];
-        let newkey   = path.shift() + '.' + path.shift();
+        let newkey   = path.shift() + '/' + path.shift();
         path.unshift(newkey);
         return trigger( ctx, 'get', [fetchkey], function() {
           this.in({ _: fetchkey, '=': undefined });
@@ -661,7 +661,7 @@
         // Detect what we're writing
         let type = msg['='] ? '=' : '>';
         if (type === '>' && Array.isArray(msg[type])) {
-          msg[type] = msg[type].join('.');
+          msg[type] = msg[type].join('/');
         }
         if (!incomingData['=']) {
           trigger( ctx, 'put', [path[0], JSON.stringify({ [path[1]]: [{ '@': msg['@'], [type]: msg[type] }] })]);
@@ -671,8 +671,9 @@
         }
 
         // Free the lock
-        unwrite();
+        return unwrite();
       }
+
     }
 
     // Write once we're ready
