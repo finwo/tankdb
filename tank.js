@@ -147,12 +147,20 @@
       return this;
     }
 
+    // Direct null write
+    switch(type(data)) {
+      case 'null':
+        this.in({ '@': new Date().getTime(), '#': this['#'], '=': null });
+        return this;
+    }
+
     // Publish everything with the whole path
     // Act as if data is incoming, simplifying local persistent storage
     let tank = this;
     (function recurse( path, data ) {
 
       // TODO: handle object reference
+      if (  )
       Object.keys(data).forEach(function( key ) {
         let fullpath = path.concat(key),
             now      = new Date().getTime();
