@@ -111,6 +111,12 @@
 
   // Following a path
   Tank.prototype.get = function( key ) {
+    if (('object' === typeof key) && key['#']) {
+      return Tank.call({
+        '#': key['#'].split('/'),
+        '_': Object.assign({},this._),
+      });
+    }
     if (Array.isArray(key)) {
       let result = this;
       let path   = key.slice();
@@ -530,8 +536,32 @@
           return 0;
         }).pop()];
       });
-      ctx.in({ '#': incomingData._, '><': incomingData['='] });
+      ctx.in({ '#': msg['<'], '><': incomingData['='] });
     })();
+  });
+
+  // Network deduplication
+  // Blocks already-seen messages
+  // TODO: verify signatures etc
+  let txdedup = [], dedupto;
+  Tank.on('in', function( next, msg ) {
+    let stringified = JSON.stringify(msg);
+    if (~txdedup.indexOf(stringified)) return;
+    next(msg);
+  });
+  Tank.on('out', function( next, msg ) {
+    txdedup.push(msg);
+    if (!dedupto) dedupto = setTimeout(function() {
+      while(txdedup.length > 16) txdedup.shift();
+      dedupto = false;
+    }, 100);
+    next(msg);
+  });
+
+  // Network retransmission
+  Tank.on('in', function( next, msg ) {
+    next(msg);
+    this.out(msg);
   });
 
   // Store incoming data
@@ -661,30 +691,6 @@
     if (root._.writeQueue) return root._.writeQueue.push(write);
     root._.writeQueue = [write];
     unwrite();
-  });
-
-  // Network deduplication
-  // Blocks already-seen messages
-  // TODO: verify signatures etc
-  let txdedup = [], dedupto;
-  Tank.on('in', function( next, msg ) {
-    let stringified = JSON.stringify(msg);
-    if (~txdedup.indexOf(stringified)) return;
-    next(msg);
-  });
-  Tank.on('out', function( next, msg ) {
-    txdedup.push(msg);
-    if (!dedupto) dedupto = setTimeout(function() {
-      while(txdedup.length > 16) txdedup.shift();
-      dedupto = false;
-    }, 100);
-    next(msg);
-  });
-
-  // Network retransmission
-  Tank.on('in', function( next, msg ) {
-    next(msg);
-    this.out(msg);
   });
 
   // Sending data to supported peers
