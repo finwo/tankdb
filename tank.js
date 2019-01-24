@@ -142,7 +142,7 @@
     }
 
     // Publish a new reference
-    if (data['#']) {
+    if (data && data['#']) {
       this.in({ '@': new Date().getTime(), '#': this['#'], '>': data['#'] });
       return this;
     }
@@ -380,26 +380,6 @@
     next(msg);
   });
 
-  // // Response cache
-  // Tank.on('in', function(next, msg) {
-  //   next(msg);
-  //   if (!this._.root._.responseCache) this._.root._.responseCache = {data:{},keys:[]};
-  //   let cache = this._.root._.responseCache;
-  //   if (msg['><']) {
-  //     cache.keys.push(msg['#']);
-  //     cache.data[msg['#']] = msg['><'];
-  //   }
-  //   if (msg['<'] && (msg['<'] in cache.data)) {
-  //     this.in({ '#': msg['<'], '><': cache.data[msg['<']], '?': Math.round(new Date().getTime()/100) });
-  //     return;
-  //   }
-  //   while (cache.keys.length>2) {
-  //     let banish = cache.keys.shift();
-  //     if (~cache.keys.indexOf(banish)) continue;
-  //     delete cache.data[banish];
-  //   }
-  // });
-
   // Handle storage adapter responses
   // TODO: THIS MUST NOT BE A GLOBAL VARIABLE
   let localListeners = {};
@@ -436,7 +416,8 @@
 
     // Handle .on
     appListeners.on.forEach(function(listener) {
-      if ( listener.path.join('/') !== msgKey ) return;
+      if (Array.isArray(listener.path)) listener.path = listener.path.join('/');
+      if ( listener.path !== msgKey ) return;
       listener.fn(msg);
     });
   });
@@ -606,24 +587,26 @@
         if ( path[0] !== incomingData._ ) {
           // Missing = write it
           if (!incomingData['=']) {
-            incomingData['='] = JSON.stringify({
+            incomingData['='] = {
               [path[0].split('/').pop()]: [{ '@': new Date().getTime(), '>': path[0] }]
-            });
-            trigger( ctx, 'put', [ incomingData._, incomingData['='] ] );
-          }
+            };
+            trigger( ctx, 'put', [ incomingData._, JSON.stringify(incomingData['=']) ] );
+          } else {
 
-          // We know it's supposed to be an object
-          if ('null' === incomingData['=']) {
-            incomingData['='] = '{}';
-          }
+            // We know it's supposed to be an object
+            if ('null' === incomingData['=']) {
+              incomingData['='] = '{}';
+            }
 
-          // Decode the incoming data
-          incomingData['='] = JSON.parse(incomingData['=']);
+            // Decode the incoming data
+            incomingData['='] = JSON.parse(incomingData['=']);
+          }
 
           // Ensure our key exists
           if (!incomingData['='][path[0].split('/').pop()]) {
             incomingData['='][path[0].split('/').pop()] = [{ '@': new Date().getTime(), '>': path[0] }];
             trigger( ctx, 'put', [ incomingData._, JSON.stringify(incomingData['=']) ] );
+            ctx.out({ '<': incomingData._ });
           }
 
           // Fetch the latest non-future version
@@ -636,7 +619,6 @@
           // Missing = someone else is working on it
           if (!incomingData['=']) {
             incomingData['='] = '{}';
-            // trigger( ctx, 'put', [incomingData._,incomingData['=']] );
           }
 
           // Decode the incoming data
@@ -647,6 +629,7 @@
         if (current && current['>']) {
           localListeners[path[0]] = localListeners[path[0]] || [];
           localListeners[path[0]].push(write);
+
           path[0] = current['>'];
           return trigger( ctx, 'get', [path[0]], function() {
             this.in({ _: path[0], '=': undefined });
