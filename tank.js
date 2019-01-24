@@ -18,9 +18,8 @@
 })(function() {
 
   // Fetch a reference to global
-  let universe = new Function('return this').call();
-
-  function noop(){};
+  let universe = new Function('return this').call(),
+      noop     = function(){};
 
   // Detect the type of a variable
   function type( subject ) {
@@ -108,7 +107,7 @@
   Tank.prototype.out = function() {
     trigger( this._.root, 'out', arguments );
     return this;
-  }
+  };
 
   // Following a path
   Tank.prototype.get = function( key ) {
@@ -154,7 +153,7 @@
         switch(type(data[key])) {
           case 'array':
           case 'object':
-            if (!data[key]) return tank.in({ '@': now, '#': fullpath, '=': null })
+            if (!data[key]) return tank.in({ '@': now, '#': fullpath, '=': null });
             tank.in({ '@': now, '#': fullpath, '>': fullpath });
             recurse( fullpath, data[key] );
             break;
@@ -193,11 +192,11 @@
     function receive(msg) {
       if (found) return;
       msg   = Object.assign({},msg);
-      if (msg['_'] && !msg['=']) {
-        localListeners[msg['_']].push(receive);
+      if (msg._ && !msg['=']) {
+        localListeners[msg._].push(receive);
         return;
       }
-      if (msg['_']) {
+      if (msg._) {
         msg = {'><' : JSON.parse(msg['='])};
       }
       found = true;
@@ -248,7 +247,7 @@
     // Emit request & keep listening
     function receive(msg) {
       msg = Object.assign({},msg);
-      if (msg['_']) {
+      if (msg._) {
         localListeners[ctx['#'].join('/')].push(receive);
         if (msg['='] === undefined) return;
         msg = {'><': JSON.parse(msg['='])};
@@ -453,9 +452,9 @@
         // Re-listen, this function should NEVER get undefined
         // Why? Parallel .once & store generates undefined incomingData['=']
         if (!incomingData['=']) {
-          localListeners[incomingData['_']] = localListeners[incomingData['_']] || [];
-          localListeners[incomingData['_']].push(next);
-          return trigger( ctx, 'get', [incomingData['_']] );
+          localListeners[incomingData._] = localListeners[incomingData._] || [];
+          localListeners[incomingData._].push(next);
+          return trigger( ctx, 'get', [incomingData._] );
         }
 
         // Decode data
@@ -463,7 +462,7 @@
         incomingData['='] = JSON.parse(incomingData['=']);
 
         // Fetch the value
-        if ( incomingData['_'] !== path[0] ) {
+        if ( incomingData._ !== path[0] ) {
           if (!incomingData['='][path[0].split('/').pop()]) return;
           current = incomingData['='][path[0].split('/').pop()].filter(function(version) {
             return version['@'] <= (new Date().getTime());
@@ -531,7 +530,7 @@
           return 0;
         }).pop()];
       });
-      ctx.in({ '#': incomingData['_'], '><': incomingData['='] });
+      ctx.in({ '#': incomingData._, '><': incomingData['='] });
     })();
   });
 
@@ -570,13 +569,13 @@
         incomingData = Object.assign({}, incomingData);
 
         // Refs
-        if ( path[0] !== incomingData['_'] ) {
+        if ( path[0] !== incomingData._ ) {
           // Missing = write it
           if (!incomingData['=']) {
             incomingData['='] = JSON.stringify({
               [path[0].split('/').pop()]: [{ '@': new Date().getTime(), '>': path[0] }]
             });
-            trigger( ctx, 'put', [ incomingData['_'], incomingData['='] ] );
+            trigger( ctx, 'put', [ incomingData._, incomingData['='] ] );
           }
 
           // Decode the incoming data
@@ -585,7 +584,7 @@
           // Ensure our key exists
           if (!incomingData['='][path[0].split('/').pop()]) {
             incomingData['='][path[0].split('/').pop()] = [{ '@': new Date().getTime(), '>': path[0] }];
-            trigger( ctx, 'put', [ incomingData['_'], JSON.stringify(incomingData['=']) ] );
+            trigger( ctx, 'put', [ incomingData._, JSON.stringify(incomingData['=']) ] );
           }
 
           // Fetch the latest non-future version
@@ -598,7 +597,7 @@
           // Missing = someone else is working on it
           if (!incomingData['=']) {
             incomingData['='] = 'null';
-            // trigger( ctx, 'put', [incomingData['_'],incomingData['=']] );
+            // trigger( ctx, 'put', [incomingData._,incomingData['=']] );
           }
 
           // Decode the incoming data
