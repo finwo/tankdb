@@ -138,7 +138,7 @@
 
     // Publish a new reference
     if (data['#']) {
-      this.in({ '@': new Date().getTime(), '#': data['#'], '>': data['#'] });
+      this.in({ '@': new Date().getTime(), '#': this['#'], '>': data['#'] });
       return this;
     }
 
@@ -408,30 +408,6 @@
     }
   });
 
-  // Network deduplication
-  // Blocks already-seen messages
-  // TODO: verify signatures etc
-  let txdedup = [], dedupto;
-  Tank.on('in', function( next, msg ) {
-    let stringified = JSON.stringify(msg);
-    if (~txdedup.indexOf(stringified)) return;
-    next(msg);
-  });
-  Tank.on('out', function( next, msg ) {
-    txdedup.push(msg);
-    if (!dedupto) dedupto = setTimeout(function() {
-      while(txdedup.length > 16) txdedup.shift();
-      dedupto = false;
-    }, 100);
-    next(msg);
-  });
-
-  // Network retransmission
-  Tank.on('in', function( next, msg ) {
-    next(msg);
-    this.out(msg);
-  });
-
   // Handle app listeners
   // TODO: THIS MUST NOT BE A GLOBAL VARIABLE
   let appListeners = {on:[],once:[]};
@@ -686,6 +662,30 @@
     if (root._.writeQueue) return root._.writeQueue.push(write);
     root._.writeQueue = [write];
     unwrite();
+  });
+
+  // Network deduplication
+  // Blocks already-seen messages
+  // TODO: verify signatures etc
+  let txdedup = [], dedupto;
+  Tank.on('in', function( next, msg ) {
+    let stringified = JSON.stringify(msg);
+    if (~txdedup.indexOf(stringified)) return;
+    next(msg);
+  });
+  Tank.on('out', function( next, msg ) {
+    txdedup.push(msg);
+    if (!dedupto) dedupto = setTimeout(function() {
+      while(txdedup.length > 16) txdedup.shift();
+      dedupto = false;
+    }, 100);
+    next(msg);
+  });
+
+  // Network retransmission
+  Tank.on('in', function( next, msg ) {
+    next(msg);
+    this.out(msg);
   });
 
   // Sending data to supported peers
