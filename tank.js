@@ -251,6 +251,7 @@
 
     // Normal behavior
     // Emit request & keep listening
+    let previousVersion = null;
     function receive(msg) {
       msg = Object.assign({},msg);
       if (msg._) {
@@ -276,6 +277,8 @@
             obj[prop] = obj[prop]['='];
           }
         });
+        if (previousVersion === JSON.stringify(obj)) return;
+        previousVersion = JSON.stringify(obj);
         cb.call(ctx,obj,msg['#']);
       }
     }
@@ -367,16 +370,14 @@
     next(msg);
   });
 
-  // Ensure each message has a timestamp
-  Tank.on('in', function(next, msg) {
-    if ('object' === typeof msg) msg['?'] = msg['?'] || new Date().getTime();
-    next(msg);
-  });
-
   // FIRST OUT
   // Encode outgoing data
   Tank.on('out', function(next, msg) {
-    next(JSON.stringify(msg));
+    if ('object' === typeof msg) {
+      msg['?'] = msg['?'] || new Date().getTime()
+      msg = JSON.stringify(msg);
+    }
+    next(msg);
   });
 
   // Response cache
@@ -389,9 +390,10 @@
       cache.data[msg['#']] = msg['><'];
     }
     if (msg['<'] && (msg['<'] in cache.data)) {
-      this.in({ '#': msg['<'], '><': cache.data[msg['<']] });
+      this.in({ '#': msg['<'], '><': cache.data[msg['<']], '?': Math.round(new Date().getTime()/100) });
+      return;
     }
-    while (cache.keys.length>8) {
+    while (cache.keys.length>2) {
       let banish = cache.keys.shift();
       if (~cache.keys.indexOf(banish)) continue;
       delete cache.data[banish];
@@ -447,6 +449,7 @@
 
     // Ensure this is a request
     if (!msg['<']) return;
+
     // Let's follow the path
     let path = msg['<'].split('/');
     (function next(incomingData) {
@@ -548,20 +551,16 @@
     let stringified = JSON.stringify(msg);
     if (~txdedup.indexOf(stringified)) return;
     next(msg);
+    this.out(msg);
   });
   Tank.on('out', function( next, msg ) {
     txdedup.push(msg);
     if (!dedupto) dedupto = setTimeout(function() {
       while(txdedup.length > 16) txdedup.shift();
       dedupto = false;
-    }, 100);
+    }, 200);
+    if ( txdedup.length > 2 && msg === txdedup[txdedup.length-2] ) return;
     next(msg);
-  });
-
-  // Network retransmission
-  Tank.on('in', function( next, msg ) {
-    next(msg);
-    this.out(msg);
   });
 
   // Store incoming data
