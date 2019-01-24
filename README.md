@@ -135,7 +135,7 @@ require('tankdb/lib/adapter/websocket');
 Custom websocket libraries are supported (well, libraries honering it's API). To use a custom library, pass it into `opts.WebSocket`.
 Peers to connect to can be passed into `opt.peers`, allowing you to set up a server..
 
-## Supporting TankDB
+## Supporting TankDB <a id="supporting" href="#supporting">#</a>
 
 Supporting this project can be done in multiple ways, as listed below.
 
