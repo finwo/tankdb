@@ -586,7 +586,12 @@
     }
 
     // TODO: follow the path (maybe generate a fresh queue)
-    let path  = msg['#'].slice();
+    let path = msg['#'];
+    if (Array.isArray(path)) {
+      path = path.slice();
+    } else {
+      path = path.split('/');
+    }
     function write(incomingData) {
 
       // Sanity check
