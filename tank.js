@@ -206,7 +206,7 @@
         msg = {'><' : JSON.parse(msg['='])};
       }
       found = true;
-      if (msg['=']) {
+      if ('=' in msg) {
         cb.call(ctx,msg['='],msg['#']);
       } else if (msg['><']) {
         let obj = Object.assign({},msg['><']);
@@ -251,7 +251,7 @@
 
     // Normal behavior
     // Emit request & keep listening
-    let previousVersion = null;
+    let previousVersion = undefined;
     function receive(msg) {
       msg = Object.assign({},msg);
       if (msg._) {
@@ -259,7 +259,7 @@
         if (msg['='] === undefined) return;
         msg = {'><': JSON.parse(msg['='])};
       }
-      if (msg['=']) {
+      if ('=' in msg) {
         cb.call(ctx, msg['='], msg['#']);
       } else if (msg['><']) {
         let obj = Object.assign({},msg['><']);
@@ -380,25 +380,25 @@
     next(msg);
   });
 
-  // Response cache
-  Tank.on('in', function(next, msg) {
-    next(msg);
-    if (!this._.root._.responseCache) this._.root._.responseCache = {data:{},keys:[]};
-    let cache = this._.root._.responseCache;
-    if (msg['><']) {
-      cache.keys.push(msg['#']);
-      cache.data[msg['#']] = msg['><'];
-    }
-    if (msg['<'] && (msg['<'] in cache.data)) {
-      this.in({ '#': msg['<'], '><': cache.data[msg['<']], '?': Math.round(new Date().getTime()/100) });
-      return;
-    }
-    while (cache.keys.length>2) {
-      let banish = cache.keys.shift();
-      if (~cache.keys.indexOf(banish)) continue;
-      delete cache.data[banish];
-    }
-  });
+  // // Response cache
+  // Tank.on('in', function(next, msg) {
+  //   next(msg);
+  //   if (!this._.root._.responseCache) this._.root._.responseCache = {data:{},keys:[]};
+  //   let cache = this._.root._.responseCache;
+  //   if (msg['><']) {
+  //     cache.keys.push(msg['#']);
+  //     cache.data[msg['#']] = msg['><'];
+  //   }
+  //   if (msg['<'] && (msg['<'] in cache.data)) {
+  //     this.in({ '#': msg['<'], '><': cache.data[msg['<']], '?': Math.round(new Date().getTime()/100) });
+  //     return;
+  //   }
+  //   while (cache.keys.length>2) {
+  //     let banish = cache.keys.shift();
+  //     if (~cache.keys.indexOf(banish)) continue;
+  //     delete cache.data[banish];
+  //   }
+  // });
 
   // Handle storage adapter responses
   // TODO: THIS MUST NOT BE A GLOBAL VARIABLE
@@ -574,7 +574,7 @@
     // Check if this msg needs processing
     if (!msg['@']) return;
     if (!msg['#']) return;
-    if (!(msg['=']||msg['>'])) return;
+    if (!('=' in msg || '>' in msg)) return;
 
     function unwrite() {
       if (!root._.writeQueue) return;
@@ -612,6 +612,11 @@
             trigger( ctx, 'put', [ incomingData._, incomingData['='] ] );
           }
 
+          // We know it's supposed to be an object
+          if ('null' === incomingData['=']) {
+            incomingData['='] = '{}';
+          }
+
           // Decode the incoming data
           incomingData['='] = JSON.parse(incomingData['=']);
 
@@ -630,7 +635,7 @@
 
           // Missing = someone else is working on it
           if (!incomingData['=']) {
-            incomingData['='] = 'null';
+            incomingData['='] = '{}';
             // trigger( ctx, 'put', [incomingData._,incomingData['=']] );
           }
 
@@ -674,15 +679,15 @@
       if (path.length === 2) {
 
         // Detect what we're writing
-        let type = msg['='] ? '=' : '>';
+        let type = '=' in msg ? '=' : '>';
         if (type === '>' && Array.isArray(msg[type])) {
           msg[type] = msg[type].join('/');
         }
-        if (!incomingData['=']) {
-          trigger( ctx, 'put', [path[0], JSON.stringify({ [path[1]]: [{ '@': msg['@'], [type]: msg[type] }] })]);
-        } else {
+        if ( '=' in incomingData ) {
           merge(incomingData['='], { [path[1]]: [{ '@': msg['@'], [type]: msg[type] }] });
           trigger( ctx, 'put', [path[0], JSON.stringify(incomingData['='])] );
+        } else {
+          trigger( ctx, 'put', [path[0], JSON.stringify({ [path[1]]: [{ '@': msg['@'], [type]: msg[type] }] })]);
         }
 
         // Free the lock
