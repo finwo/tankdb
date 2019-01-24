@@ -374,30 +374,6 @@
     next(JSON.stringify(msg));
   });
 
-  // Network deduplication
-  // Blocks already-seen messages
-  let txdedup = [], dedupto;
-  Tank.on('in', function( next, msg ) {
-    let stringified = JSON.stringify(msg);
-    if (~txdedup.indexOf(stringified)) return;
-    next(msg);
-  });
-  Tank.on('out', function( next, msg ) {
-    txdedup.push(msg);
-    if (!dedupto) dedupto = setTimeout(function() {
-      while(txdedup.length > 16) txdedup.shift();
-      dedupto = false;
-    }, 100);
-    next(msg);
-  });
-
-  // Network retransmission
-  Tank.on('in', function( next, msg ) {
-    next(msg);
-    // TODO: verify signatures etc
-    this.out(msg);
-  });
-
   // Response cache
   Tank.on('in', function(next, msg) {
     next(msg);
@@ -430,6 +406,30 @@
       if (!fn) continue;
       fn(msg);
     }
+  });
+
+  // Network deduplication
+  // Blocks already-seen messages
+  // TODO: verify signatures etc
+  let txdedup = [], dedupto;
+  Tank.on('in', function( next, msg ) {
+    let stringified = JSON.stringify(msg);
+    if (~txdedup.indexOf(stringified)) return;
+    next(msg);
+  });
+  Tank.on('out', function( next, msg ) {
+    txdedup.push(msg);
+    if (!dedupto) dedupto = setTimeout(function() {
+      while(txdedup.length > 16) txdedup.shift();
+      dedupto = false;
+    }, 100);
+    next(msg);
+  });
+
+  // Network retransmission
+  Tank.on('in', function( next, msg ) {
+    next(msg);
+    this.out(msg);
   });
 
   // Handle app listeners
