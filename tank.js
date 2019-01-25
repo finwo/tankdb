@@ -141,14 +141,14 @@
       if ( !data ) throw new Error('Non-object data can not be saved at the root');
     }
 
-    // Publish a new reference
-    if (data && data['#']) {
-      this.in({ '@': new Date().getTime(), '#': this['#'], '>': data['#'] });
-      return this;
-    }
-
     // Direct null write
     switch(type(data)) {
+      case 'object':
+        if (data['#']) {
+          this.in({ '@': new Date().getTime(), '#': this['#'], '>': data['#'] });
+          return this;
+        }
+        break;
       case 'null':
         this.in({ '@': new Date().getTime(), '#': this['#'], '=': null });
         return this;
@@ -160,7 +160,6 @@
     (function recurse( path, data ) {
 
       // TODO: handle object reference
-      if (  )
       Object.keys(data).forEach(function( key ) {
         let fullpath = path.concat(key),
             now      = new Date().getTime();
