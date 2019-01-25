@@ -259,16 +259,20 @@
 
     // Normal behavior
     // Emit request & keep listening
-    let obj          = {},
-        timeTracking = {};
+    let obj             = {},
+        timeTracking    = {},
+        previousVersion = undefined;
     function receive(msg) {
       msg = Object.assign({},msg);
+      if (Array.isArray(msg['#'])) msg['#'] = msg['#'].join('/');
       if (msg._) {
         localListeners[ctx['#'].join('/')].push(receive);
         if (msg['='] === undefined) return;
         msg = {'><': JSON.parse(msg['='])};
       }
       if ('=' in msg) {
+        obj          = {};
+        timeTracking = {};
         cb.call(ctx, msg['='], msg['#']);
       } else if (msg['><']) {
         let updated = false;
@@ -278,8 +282,11 @@
           if (version['@'] <= timeTracking[prop]) return;
           timeTracking[prop] = version['@'];
           updated            = true;
-          obj[prop] = version['>'] ? {'#':version['?']} : version['='];
+          obj[prop] = version['>'] ? {'#':version['>']} : version['='];
         });
+        let stringified = JSON.stringify(obj);
+        if ( stringified === previousVersion) return;
+        previousVersion = stringified;
         if (updated) cb.call(ctx,obj,msg['#']);
       }
     }
@@ -307,14 +314,14 @@
       map  : function( mode, receiver ) {
         if (!receiver) return;
         if (!~['on','once'].indexOf(mode)) return;
-        let knownKeys = [];
+        let known = {};
         ctx[fetch](function(data) {
           data = filter(data);
           if ('undefined' === typeof data) return;
           let keys = Object.keys(data);
           keys.forEach(function(key) {
-            if (~knownKeys.indexOf(key)) return;
-            knownKeys.push(key);
+            if (known[key]) return;
+            known[key] = true;
             ctx.get(key)[mode](receiver);
           });
         });
@@ -508,18 +515,13 @@
         // Re-publish that data (at our input, it could be a self-request)
         version['#'] = msg['<'];
         ctx.in(version);
+        return;
       }
 
       // We're fetching an object, not a property
       if (!incomingData['=']) return;
       Object.keys(incomingData['=']).forEach(function(key) {
-        incomingData['='][key] = [incomingData['='][key].filter(function(version) {
-          return version['@'] <= new Date().getTime();
-        }).sort(function(a,b) {
-          if ( a['@'] < b['@'] ) return -1;
-          if ( a['@'] > b['@'] ) return 1;
-          return 0;
-        }).pop()];
+        incomingData['='][key] = [current(incomingData['='][key])];
       });
       ctx.in({ '#': msg['<'], '><': incomingData['='] });
     })();
