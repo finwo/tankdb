@@ -59,6 +59,19 @@
     return target;
   }
 
+  // Fetch the current version from a list
+  function current( versions ) {
+    if (!Array.isArray(versions)) return undefined;
+    let result = undefined;
+    versions.forEach(function (version) {
+      if (!version) return;
+      if (version['@'] > new Date().getTime()) return;
+      if (!result) return result = version;
+      if (version['@'] > result['@']) return result = version;
+    });
+    return result;
+  }
+
   // Our main constructor
   function Tank(options) {
 
@@ -161,20 +174,18 @@
 
       // TODO: handle object reference
       Object.keys(data).forEach(function( key ) {
-        let fullpath = path.concat(key),
-            now      = new Date().getTime();
+        let fullpath = path.concat(key);
         switch(type(data[key])) {
           case 'array':
           case 'object':
-            if (!data[key]) return tank.in({ '@': now, '#': fullpath, '=': null });
-            tank.in({ '@': now, '#': fullpath, '>': fullpath });
+            tank.in({ '@': new Date().getTime(), '#': fullpath, '>': fullpath });
             recurse( fullpath, data[key] );
             break;
           case 'string':
           case 'number':
           case 'null':
           case 'boolean':
-            tank.in({ '@': now, '#': fullpath, '=': data[key] });
+            tank.in({ '@': new Date().getTime(), '#': fullpath, '=': data[key] });
             break;
         }
       });
@@ -218,18 +229,8 @@
       } else if (msg['><']) {
         let obj = Object.assign({},msg['><']);
         Object.keys(obj).forEach(function(prop) {
-          obj[prop] = obj[prop].filter(function(version) {
-            return version['@'] <= new Date().getTime();
-          }).sort(function( a, b ) {
-            if ( a['@'] < b['@'] ) return -1;
-            if ( a['@'] > b['@'] ) return 1;
-            return 0;
-          }).pop();
-          if (obj[prop]['>']) {
-            obj[prop] = { '#': obj[prop]['>'] };
-          } else {
-            obj[prop] = obj[prop]['='];
-          }
+          obj[prop] = current(obj[prop]);
+          obj[prop] = obj[prop]['>'] ? {'#':obj[prop]['?']} : obj[prop]['='];
         });
         cb.call(ctx,obj,msg['#']);
       }
@@ -258,7 +259,8 @@
 
     // Normal behavior
     // Emit request & keep listening
-    let previousVersion = undefined;
+    let obj          = {},
+        timeTracking = {};
     function receive(msg) {
       msg = Object.assign({},msg);
       if (msg._) {
@@ -269,24 +271,16 @@
       if ('=' in msg) {
         cb.call(ctx, msg['='], msg['#']);
       } else if (msg['><']) {
-        let obj = Object.assign({},msg['><']);
-        Object.keys(obj).forEach(function(prop) {
-          obj[prop] = obj[prop].filter(function(version) {
-            return version['@'] <= new Date().getTime();
-          }).sort(function( a, b ) {
-            if ( a['@'] < b['@'] ) return -1;
-            if ( a['@'] > b['@'] ) return 1;
-            return 0;
-          }).pop();
-          if (obj[prop]['>']) {
-            obj[prop] = { '#': obj[prop]['>'] };
-          } else {
-            obj[prop] = obj[prop]['='];
-          }
+        let updated = false;
+        Object.keys(msg['><']).forEach(function(prop) {
+          if (!(prop in timeTracking)) timeTracking[prop] = 0;
+          let version = current(msg['><'][prop]);
+          if (version['@'] <= timeTracking[prop]) return;
+          timeTracking[prop] = version['@'];
+          updated            = true;
+          obj[prop] = version['>'] ? {'#':version['?']} : version['='];
         });
-        if (previousVersion === JSON.stringify(obj)) return;
-        previousVersion = JSON.stringify(obj);
-        cb.call(ctx,obj,msg['#']);
+        if (updated) cb.call(ctx,obj,msg['#']);
       }
     }
     appListeners.on.push({
@@ -442,7 +436,7 @@
     let path = msg['<'].split('/');
     (function next(incomingData) {
       if (!path.length) return;
-      let current;
+      let version;
 
       if (incomingData) {
 
@@ -461,17 +455,17 @@
         // Fetch the value
         if ( incomingData._ !== path[0] ) {
           if (!incomingData['='][path[0].split('/').pop()]) return;
-          current = incomingData['='][path[0].split('/').pop()].filter(function(version) {
+          version = incomingData['='][path[0].split('/').pop()].filter(function(version) {
             return version['@'] <= (new Date().getTime());
           }).pop();
         }
 
         // Follow refs
         // TODO: this is probably broken
-        if (current && current['>']) {
-          localListeners[current['>']] = localListeners[current['>']] || [];
-          localListeners[current['>']].push(next);
-          path[0] = current['>'];
+        if (version && version['>']) {
+          localListeners[version['>']] = localListeners[version['>']] || [];
+          localListeners[version['>']].push(next);
+          path[0] = version['>'];
           return trigger( ctx, 'get', [path[0]]);
         }
       }
@@ -499,21 +493,21 @@
 
         // Fetch the most recent version
         if (!incomingData['='][path[1]]) return;
-        current = incomingData['='][path[1]].filter(function(version) {
+        version = incomingData['='][path[1]].filter(function(version) {
           return version['@'] <= (new Date().getTime());
         }).pop();
 
         // If it's a ref, follow it
-        if (current['>']) {
-          localListeners[current['>']] = localListeners[current['>']] || [];
-          localListeners[current['>']].push(next);
-          path = [current['>']];
-          return trigger( ctx, 'get', [current['>']]);
+        if (version['>']) {
+          localListeners[version['>']] = localListeners[version['>']] || [];
+          localListeners[version['>']].push(next);
+          path = [version['>']];
+          return trigger( ctx, 'get', [version['>']]);
         }
 
         // Re-publish that data (at our input, it could be a self-request)
-        current['#'] = msg['<'];
-        ctx.in(current);
+        version['#'] = msg['<'];
+        ctx.in(version);
       }
 
       // We're fetching an object, not a property
@@ -583,8 +577,9 @@
     function write(incomingData) {
 
       // Sanity check
+      if (parseInt(msg['@']) > new Date().getTime()) return unwrite();
       if (!path.length) return unwrite();
-      let current;
+      let version;
 
       // Handle incoming data & act accordingly
       if (incomingData) {
@@ -592,56 +587,63 @@
 
         // Refs
         if ( path[0] !== incomingData._ ) {
-          // Missing = write it
+          let lastKey = path[0].split('/').pop();
+
+          // Missing = start building
           if (!incomingData['=']) {
-            incomingData['='] = {
-              [path[0].split('/').pop()]: [{ '@': new Date().getTime(), '>': path[0] }]
-            };
-            trigger( ctx, 'put', [ incomingData._, JSON.stringify(incomingData['=']) ] );
+            incomingData['='] = {};
           } else {
-
-            // We know it's supposed to be an object
-            if ('null' === incomingData['=']) {
-              incomingData['='] = '{}';
-            }
-
-            // Decode the incoming data
+            // Decode
+            if (incomingData['='] === 'null') incomingData['='] = '{}';
             incomingData['='] = JSON.parse(incomingData['=']);
           }
 
-          // Ensure our key exists
-          if (!incomingData['='][path[0].split('/').pop()]) {
-            incomingData['='][path[0].split('/').pop()] = [{ '@': new Date().getTime(), '>': path[0] }];
-            trigger( ctx, 'put', [ incomingData._, JSON.stringify(incomingData['=']) ] );
-            ctx.out({ '<': incomingData._ });
+          // Missing key = write
+          if (!incomingData['='][lastKey]) {
+            incomingData['='][lastKey] = [];
+            incomingData['='][lastKey].push({'@': new Date().getTime(), '>': path[0]});
+            trigger( ctx, 'put', [incomingData._,JSON.stringify(incomingData['='])] );
+            ctx.in({ '<': incomingData._ });
+          }
+
+          // nullified data = write
+          version = current(incomingData['='][lastKey]);
+          if (!version['>']) {
+            incomingData['='][lastKey].push({'@': new Date().getTime(), '>': path[0]});
+            trigger( ctx, 'put', [incomingData._,JSON.stringify(incomingData['='])] );
+            ctx.in({ '<': incomingData._ });
           }
 
           // Fetch the latest non-future version
-          current = incomingData['='][path[0].split('/').pop()].filter(function(version) {
-            return version['@'] <= (new Date().getTime());
-          }).pop();
+          version = current(incomingData['='][lastKey]);
 
         } else {
 
-          // Missing = someone else is working on it
-          if (!incomingData['=']) {
-            incomingData['='] = '{}';
-          }
-
           // Decode the incoming data
+          if (!incomingData['=']) incomingData['='] = '{}';
           incomingData['='] = JSON.parse(incomingData['=']);
         }
 
         // Fowllow any ref
-        if (current && current['>']) {
+        if (version && version['>']) {
           localListeners[path[0]] = localListeners[path[0]] || [];
           localListeners[path[0]].push(write);
-
-          path[0] = current['>'];
+          path[0] = version['>'];
           return trigger( ctx, 'get', [path[0]], function() {
             this.in({ _: path[0], '=': undefined });
           });
         }
+      }
+
+      // Ensure we have data
+      if (!incomingData) {
+        localListeners[path[0]] = localListeners[path[0]] || [];
+        localListeners[path[0]].push(write);
+        return trigger( ctx, 'get', [path[0]], function() {
+          this.in({ _: path[0], '=': undefined });
+        });
+      } else {
+        incomingData = Object.assign({},incomingData);
       }
 
       // Iterate down if required
@@ -656,15 +658,6 @@
         });
       }
 
-      // Ensure we have data
-      if (!incomingData) {
-        localListeners[path[0]] = localListeners[path[0]] || [];
-        localListeners[path[0]].push(write);
-        return trigger( ctx, 'get', [path[0]], function() {
-          this.in({ _: path[0], '=': undefined });
-        });
-      }
-
       // Write direct value
       if (path.length === 2) {
 
@@ -673,8 +666,13 @@
         if (type === '>' && Array.isArray(msg[type])) {
           msg[type] = msg[type].join('/');
         }
+
+        // Merge or direct write
+        // TODO: remove old version in merge
+        if ( '?' in incomingData ) delete incomingData['?'];
         if ( '=' in incomingData ) {
           merge(incomingData['='], { [path[1]]: [{ '@': msg['@'], [type]: msg[type] }] });
+          incomingData['='][path[1]] = [current(incomingData['='][path[1]])];
           trigger( ctx, 'put', [path[0], JSON.stringify(incomingData['='])] );
         } else {
           trigger( ctx, 'put', [path[0], JSON.stringify({ [path[1]]: [{ '@': msg['@'], [type]: msg[type] }] })]);
