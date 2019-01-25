@@ -130,6 +130,9 @@
         '_': Object.assign({},this._),
       });
     }
+    if ('string' === typeof key && ~key.indexOf('/')) {
+      key = key.split('/');
+    }
     if (Array.isArray(key)) {
       let result = this;
       let path   = key.slice();
@@ -676,8 +679,10 @@
           merge(incomingData['='], { [path[1]]: [{ '@': msg['@'], [type]: msg[type] }] });
           incomingData['='][path[1]] = [current(incomingData['='][path[1]])];
           trigger( ctx, 'put', [path[0], JSON.stringify(incomingData['='])] );
+          ctx.in({ '<': path[0] });
         } else {
           trigger( ctx, 'put', [path[0], JSON.stringify({ [path[1]]: [{ '@': msg['@'], [type]: msg[type] }] })]);
+          ctx.in({ '<': path[0] });
         }
 
         // Free the lock
