@@ -98,6 +98,7 @@
       opts : this._.opts || opts,
       once : this._.once || false, // Fetch from once + path, not only path
       map  : this._.map  || false, // Fetch from map  + path, not only path
+      sep  : this._.sep  || '/',
     };
 
     // Trigger opt on fresh instance
@@ -126,12 +127,12 @@
   Tank.prototype.get = function( key ) {
     if (('object' === typeof key) && key['#']) {
       return Tank.call({
-        '#': key['#'].split('/'),
+        '#': key['#'].split(this._.sep),
         '_': Object.assign({},this._),
       });
     }
-    if ('string' === typeof key && ~key.indexOf('/')) {
-      key = key.split('/');
+    if ('string' === typeof key && ~key.indexOf(this._.sep)) {
+      key = key.split(this._.sep);
     }
     if (Array.isArray(key)) {
       let result = this;
@@ -242,9 +243,9 @@
       path : ctx['#'],
       fn   : receive
     });
-    localListeners[ctx['#'].join('/')] = localListeners[ctx['#'].join('/')] || [];
-    localListeners[ctx['#'].join('/')].push(receive);
-    ctx.in({ '<': ctx['#'].join('/') });
+    localListeners[ctx['#'].join(ctx._.sep)] = localListeners[ctx['#'].join(ctx._.sep)] || [];
+    localListeners[ctx['#'].join(ctx._.sep)].push(receive);
+    ctx.in({ '<': ctx['#'].join(ctx._.sep) });
     setTimeout(function() {
       if (found) return;
       found = true;
@@ -267,9 +268,9 @@
         previousVersion = undefined;
     function receive(msg) {
       msg = Object.assign({},msg);
-      if (Array.isArray(msg['#'])) msg['#'] = msg['#'].join('/');
+      if (Array.isArray(msg['#'])) msg['#'] = msg['#'].join(ctx._.sep);
       if (msg._) {
-        localListeners[ctx['#'].join('/')].push(receive);
+        localListeners[ctx['#'].join(ctx._.sep)].push(receive);
         if (msg['='] === undefined) return;
         msg = {'><': JSON.parse(msg['='])};
       }
@@ -297,9 +298,9 @@
       path: ctx['#'],
       fn  : receive
     });
-    localListeners[ctx['#'].join('/')] = localListeners[ctx['#'].join('/')] || [];
-    localListeners[ctx['#'].join('/')].push(receive);
-    ctx.in({ '<': ctx['#'].join('/') });
+    localListeners[ctx['#'].join(ctx._.sep)] = localListeners[ctx['#'].join(ctx._.sep)] || [];
+    localListeners[ctx['#'].join(ctx._.sep)].push(receive);
+    ctx.in({ '<': ctx['#'].join(ctx._.sep) });
     return this;
   };
 
@@ -416,10 +417,11 @@
 
     // Handle .once
     let retry  = [],
-        msgKey = 'string' === typeof msg['#'] ? msg['#'] : msg['#'].join('/');
+        ctx    = this,
+        msgKey = 'string' === typeof msg['#'] ? msg['#'] : msg['#'].join(ctx._.sep);
     while(appListeners.once.length) {
       let listener = appListeners.once.shift();
-      if (Array.isArray(listener.path)) listener.path = listener.path.join('/');
+      if (Array.isArray(listener.path)) listener.path = listener.path.join(ctx._.sep);
       if ( listener.path !== msgKey ) { retry.push(listener); continue; }
       listener.fn(msg);
     }
@@ -427,7 +429,7 @@
 
     // Handle .on
     appListeners.on.forEach(function(listener) {
-      if (Array.isArray(listener.path)) listener.path = listener.path.join('/');
+      if (Array.isArray(listener.path)) listener.path = listener.path.join(ctx._.sep);
       if ( listener.path !== msgKey ) return;
       listener.fn(msg);
     });
@@ -443,7 +445,7 @@
     if (!msg['<']) return;
 
     // Let's follow the path
-    let path = msg['<'].split('/');
+    let path = msg['<'].split(ctx._.sep);
     (function next(incomingData) {
       if (!path.length) return;
       let version;
@@ -464,8 +466,8 @@
 
         // Fetch the value
         if ( incomingData._ !== path[0] ) {
-          if (!incomingData['='][path[0].split('/').pop()]) return;
-          version = incomingData['='][path[0].split('/').pop()].filter(function(version) {
+          if (!incomingData['='][path[0].split(ctx._.sep).pop()]) return;
+          version = incomingData['='][path[0].split(ctx._.sep).pop()].filter(function(version) {
             return version['@'] <= (new Date().getTime());
           }).pop();
         }
@@ -485,7 +487,7 @@
         localListeners[path[0]] = localListeners[path[0]] || [];
         localListeners[path[0]].push(next);
         let fetchkey = path[0];
-        let newkey   = path.shift() + '/' + path.shift();
+        let newkey   = path.shift() + ctx._.sep + path.shift();
         path.unshift(newkey);
         return trigger( ctx, 'get', [fetchkey]);
       }
@@ -577,7 +579,7 @@
     if (Array.isArray(path)) {
       path = path.slice();
     } else {
-      path = path.split('/');
+      path = path.split(ctx._.sep);
     }
     function write(incomingData) {
 
@@ -592,7 +594,7 @@
 
         // Refs
         if ( path[0] !== incomingData._ ) {
-          let lastKey = path[0].split('/').pop();
+          let lastKey = path[0].split(ctx._.sep).pop();
 
           // Missing = start building
           if (!incomingData['=']) {
@@ -656,7 +658,7 @@
         localListeners[path[0]] = localListeners[path[0]] || [];
         localListeners[path[0]].push(write);
         let fetchkey = path[0];
-        let newkey   = path.shift() + '/' + path.shift();
+        let newkey   = path.shift() + ctx._.sep + path.shift();
         path.unshift(newkey);
         return trigger( ctx, 'get', [fetchkey], function() {
           this.in({ _: fetchkey, '=': undefined });
@@ -669,7 +671,7 @@
         // Detect what we're writing
         let type = '=' in msg ? '=' : '>';
         if (type === '>' && Array.isArray(msg[type])) {
-          msg[type] = msg[type].join('/');
+          msg[type] = msg[type].join(ctx._.sep);
         }
 
         // Merge or direct write
