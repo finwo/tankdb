@@ -26,7 +26,7 @@
     let orgType = typeof subject;
     switch(orgType) {
       case 'object':
-        if ( null === typeof subject ) return 'null';
+        if ( null === subject ) return 'null';
         if (Array.isArray(subject)) return 'array';
         return 'object';
       default:
