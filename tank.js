@@ -167,7 +167,9 @@
         }
         break;
       case 'null':
-        this.in({ '@': new Date().getTime(), '#': this['#'], '=': null });
+      case 'string':
+      case 'number':
+        this.in({ '@': new Date().getTime(), '#': this['#'], '=': data });
         return this;
     }
 
