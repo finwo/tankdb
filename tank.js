@@ -72,6 +72,56 @@
     return result;
   }
 
+  // https://stackoverflow.com/a/18729931
+  function stringToArray( str ) {
+    var utf8 = [];
+    for (var i=0; i < str.length; i++) {
+        var charcode = str.charCodeAt(i);
+        if (charcode < 0x80) utf8.push(charcode);
+        else if (charcode < 0x800) {
+            utf8.push(0xc0 | (charcode >> 6),
+                      0x80 | (charcode & 0x3f));
+        }
+        else if (charcode < 0xd800 || charcode >= 0xe000) {
+            utf8.push(0xe0 | (charcode >> 12),
+                      0x80 | ((charcode>>6) & 0x3f),
+                      0x80 | (charcode & 0x3f));
+        }
+        else {
+            i++;
+            // UTF-16 encodes 0x10000-0x10FFFF by
+            // subtracting 0x10000 and splitting the
+            // 20 bits of 0x0-0xFFFFF into two halves
+            charcode = 0x10000 + (((charcode & 0x3ff)<<10)
+                      | (str.charCodeAt(i) & 0x3ff));
+            utf8.push(0xf0 | (charcode >>18),
+                      0x80 | ((charcode>>12) & 0x3f),
+                      0x80 | ((charcode>>6) & 0x3f),
+                      0x80 | (charcode & 0x3f));
+        }
+    }
+    return utf8;
+  }
+
+  // Hash a message
+  // Loosely based on djb2 (we don't need cryptographic strength)
+  function H( subject ) {
+    if (Buffer.isBuffer(subject)) subject = [].slice.call(subject);
+    if ('string' === typeof subject) subject = stringToArray(subject);
+    if (!Array.isArray(subject)) return false;
+    let ctx = [ 0,0,0,0,0,0,0,0 ];
+    for ( let i=0; i<subject.length; i++ ) {
+      ctx[i%8] = (ctx[i%8]*5)+subject[i];
+      if ( ctx[i%8] >= 256 ) {
+        ctx[(i+1)%8] += Math.floor(ctx[i%8]/256);
+        ctx[i%8] %= 256;
+      }
+    }
+    let out = '';
+    while(ctx.length) out += ('00'+ctx.shift().toString(16)).substr(-2);
+    return out;
+  }
+
   // Our main constructor
   function Tank(options) {
 
@@ -384,11 +434,38 @@
     next(msg);
   });
 
+  // ENSURE MSG TIMESTAMP
+  Tank.on('in', function(next, msg) {
+    msg['?'] = msg['?'] || new Date().getTime();
+    next(msg);
+  });
+
+  // Network deduplication
+  // Blocks already-seen messages
+  // TODO: verify signatures etc
+  let txdedup = [];
+  Tank.on('in', function( next, msg ) {
+    let m    = JSON.stringify(msg);
+    let hash = H(m);
+    console.log(!!~txdedup.indexOf(hash), hash, m);
+    if (msg['_']) return next(msg);
+    if (~txdedup.indexOf(hash)) return;
+    txdedup.push(hash);
+    if (txdedup.length > 8192) txdedup.shift();
+    next(msg);
+  });
+
+  // Retransmission
+  // TODO: make this smarter (detect non-update msg)
+  Tank.on('in', function(next, msg) {
+    if (!msg._) this.out(msg);
+    next(msg);
+  });
+
   // FIRST OUT
   // Encode outgoing data
   Tank.on('out', function(next, msg) {
     if ('object' === typeof msg) {
-      msg['?'] = msg['?'] || new Date().getTime()
       msg = JSON.stringify(msg);
     }
     next(msg);
@@ -532,26 +609,6 @@
       });
       ctx.in({ '#': msg['<'], '><': incomingData['='] });
     })();
-  });
-
-  // Network deduplication
-  // Blocks already-seen messages
-  // TODO: verify signatures etc
-  let txdedup = [], dedupto;
-  Tank.on('in', function( next, msg ) {
-    let stringified = JSON.stringify(msg);
-    if (~txdedup.indexOf(stringified)) return;
-    next(msg);
-    this.out(msg);
-  });
-  Tank.on('out', function( next, msg ) {
-    txdedup.push(msg);
-    if (!dedupto) dedupto = setTimeout(function() {
-      while(txdedup.length > 16) txdedup.shift();
-      dedupto = false;
-    }, 200);
-    if ( txdedup.length > 2 && msg === txdedup[txdedup.length-2] ) return;
-    next(msg);
   });
 
   // Store incoming data
