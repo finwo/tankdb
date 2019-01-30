@@ -281,7 +281,7 @@
       }
       found = true;
       if ('=' in msg) {
-        cb.call(ctx,msg['='],msg['#']);
+        cb.call(ctx,msg['='],ctx['#'].slice().pop());
       } else if (msg['><']) {
         let obj = Object.assign({},msg['><']);
         Object.keys(obj).forEach(function(prop) {
@@ -329,7 +329,7 @@
       if ('=' in msg) {
         obj          = {};
         timeTracking = {};
-        cb.call(ctx, msg['='], msg['#']);
+        cb.call(ctx, msg['='], ctx['#'].slice().pop());
       } else if (msg['><']) {
         let updated = false;
         Object.keys(msg['><']).forEach(function(prop) {
