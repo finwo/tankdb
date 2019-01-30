@@ -1,3 +1,16 @@
+/**
+ *   KEY  TYPE            CONTENT       DESCRIPTION
+ *   @    {int}           timestamp     timestamp of when the data in this message was written
+ *   ?    {int}           timestamp     timestamp of when this message was transmitted
+ *   #    {array|string}  path          path of the subject of this message
+ *   >    {array|string}  reference     redirect to a different key
+ *   <    {array|string}  request       request for the current data at this path
+ *   =    {object|mixed}  value         value of the path in this message
+ *   _    {string}        path          local storage adapter response to a request
+ *   ><   {object}        obj_response  object response to a request
+ *   <>   {array|string}  path          if you're listening to #, listen to the following path as well
+ */
+
 // Wrap to not pollute in browsers
 (function(factory) {
 
@@ -317,12 +330,22 @@
     // Emit request & keep listening
     let obj             = {},
         timeTracking    = {},
-        previousVersion = undefined;
+        previousVersion = undefined,
+        knownPaths      = [ ctx['#'].join(ctx._.sep) ];
     function receive(msg) {
       msg = Object.assign({},msg);
       if (Array.isArray(msg['#'])) msg['#'] = msg['#'].join(ctx._.sep);
+      if (msg['<>']) {
+        if (~knownPaths.indexOf(msg['<>'])) return;
+        knownPaths.push(msg['<>']);
+        appListeners.on.push({ path: msg['<>'], fn: receive });
+        if (!localListeners[msg['<>']]) localListeners[msg['<>']] = [];
+        localListeners[msg['<>']].push(receive);
+        ctx.in({ '<': msg['<>'] });
+        return;
+      }
       if (msg._) {
-        localListeners[ctx['#'].join(ctx._.sep)].push(receive);
+        localListeners[msg._].push(receive);
         if (msg['='] === undefined) return;
         msg = {'><': JSON.parse(msg['='])};
       }
@@ -588,10 +611,12 @@
         }).pop();
 
         // If it's a ref, follow it
+        // Rebroadcast the path change
         if (version['>']) {
           localListeners[version['>']] = localListeners[version['>']] || [];
           localListeners[version['>']].push(next);
           path = [version['>']];
+          version['?'] = new Date().getTime();
           return trigger( ctx, 'get', [version['>']]);
         }
 
@@ -607,6 +632,12 @@
         incomingData['='][key] = [current(incomingData['='][key])];
       });
       ctx.in({ '#': msg['<'], '><': incomingData['='] });
+      let msgPath  = msg['<'],
+          dataPath = incomingData['_'];
+      if (Array.isArray(msgPath))  msgPath  = msgPath.join(ctx._.sep);
+      if (Array.isArray(dataPath)) dataPath = dataPath.join(ctx._.sep);
+      if (msgPath === dataPath) return;
+      ctx.in({ '#': msg['<'], '<>': dataPath });
     })();
   });
 
