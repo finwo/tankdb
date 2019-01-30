@@ -288,7 +288,7 @@
           obj[prop] = current(obj[prop]);
           obj[prop] = obj[prop]['>'] ? {'#':obj[prop]['?']} : obj[prop]['='];
         });
-        cb.call(ctx,obj,msg['#']);
+        cb.call(ctx,obj,ctx['#'].slice().pop());
       }
     }
     appListeners.once.push({
@@ -343,7 +343,7 @@
         let stringified = JSON.stringify(obj);
         if ( stringified === previousVersion) return;
         previousVersion = stringified;
-        if (updated) cb.call(ctx,obj,msg['#']);
+        if (updated) cb.call(ctx,obj,ctx['#'].slice().pop());
       }
     }
     appListeners.on.push({
