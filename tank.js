@@ -447,7 +447,6 @@
   Tank.on('in', function( next, msg ) {
     let m    = JSON.stringify(msg);
     let hash = H(m);
-    console.log(!!~txdedup.indexOf(hash), hash, m);
     if (msg['_']) return next(msg);
     if (~txdedup.indexOf(hash)) return;
     txdedup.push(hash);
