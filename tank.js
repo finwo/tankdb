@@ -161,13 +161,16 @@
       opts : this._.opts || opts,
       once : this._.once || false, // Fetch from once + path, not only path
       map  : this._.map  || false, // Fetch from map  + path, not only path
-      sep  : this._.sep  || '/',
+      sep  : this._.sep  || Tank.defaultSeparator,
     };
 
     // Trigger opt on fresh instance
     if (fresh) trigger( this, 'create' );
     return this;
   }
+
+  // Some data that needs to be fetchable
+  Tank.defaultSeparator = '/';
 
   // Prevent circular json
   Tank.prototype.toJSON = function() {
