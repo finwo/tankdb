@@ -399,13 +399,22 @@
         let known = {};
         ctx[fetch](function(data) {
           data = filter(data);
-          if ('undefined' === typeof data) return;
-          let keys = Object.keys(data);
-          keys.forEach(function(key) {
-            if (known[key]) return;
-            known[key] = true;
-            ctx.get(key)[mode](receiver);
-          });
+          switch(type(data)) {
+            case 'null':
+            case 'undefined':
+              // It's an orphan
+              // Let your freak flag fly
+              // Let the child go feral
+              return;
+            default:
+              let keys = Object.keys(data);
+              keys.forEach(function(key) {
+                if (known[key]) return;
+                known[key] = true;
+                ctx.get(key)[mode](receiver);
+              });
+              break;
+          }
         });
       },
     })});
