@@ -1,0 +1,6 @@
+nested update in live queries
+manager write sometimes works, mostly not
+basedata writing logo only works if it's not part of another object
+very slow generation of invoices (cycle users is slow, timeout resolve probably)
+slow loading of transactions (check for 1000ms timeout, probably failed resolve)
+unstable null writes
