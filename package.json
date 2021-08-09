@@ -4,26 +4,25 @@
   "description": "Distributed graph database",
   "main": "tank.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 0"
+    "test": "echo \"Error: no test specified\" && exit 0",
+    "preinstall": "npx only-allow pnpm",
+    "build": "pnpm run build:code",
+    "build:code": "esbuild $(aaargh buildconfig.json)",
+    "postpublish": "PACKAGE_VERSION=$(cat package.json | grep \\\"version\\\" | head -1 | awk -F: '{print $2}' | sed 's/[\",]//g' | tr -d '[[:space:]]') && npm deprecate \"tankdb@<${PACKAGE_VERSION}\" \"Rolling release, please update to ${PACKAGE_VERSION}\""
   },
   "repository": {
     "type": "git",
-    "url": "git+https://gitlab.com/finwo/tank.git"
+    "url": "git+https://github.com/finwo/tank.git"
   },
   "author": "Robin Bron <robin@finwo.nl>",
   "license": "MIT",
   "bugs": {
-    "url": "https://gitlab.com/finwo/tank/issues"
+    "url": "https://github.com/finwo/tankdb/issues"
   },
-  "homepage": "https://gitlab.com/finwo/tank#readme",
-  "optionalDependencies": {
-    "cws": "^1.0.0"
+  "funding": {
+    "url": "https://github.com/sponsors/finwo"
   },
-  "devDependencies": {
-    "autolevel": "^0.2.10",
-    "ecstatic": "^3.3.0",
-    "ws-rc4": "^0.1.3"
-  },
+  "homepage": "https://github.com/finwodb/tank#readme",
   "keywords": [
     "tank",
     "tankdb",
@@ -48,5 +47,9 @@
     "websocket",
     "network",
     "networked"
-  ]
+  ],
+  "devDependencies": {
+    "aaargh": "^1.0.1",
+    "esbuild": "^0.12.19"
+  }
 }
