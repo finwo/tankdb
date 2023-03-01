@@ -20,7 +20,7 @@
     "cws": "^1.0.0"
   },
   "devDependencies": {
-    "autolevel": "^0.2.10",
+    "autolevel": "^2.0.3",
     "ecstatic": "^4.1.4",
     "ws-rc4": "^0.1.3"
   },
